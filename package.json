@@ -10,6 +10,7 @@
   },
   "devDependencies": {
     "prettier": "^3.7.4",
+    "prisma": "^7.8.0",
     "turbo": "^2.9.16",
     "typescript": "5.9.2"
   },
@@ -20,5 +21,9 @@
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "dependencies": {
+    "@prisma/adapter-libsql": "^7.8.0",
+    "@prisma/client": "^7.8.0"
+  }
 }
