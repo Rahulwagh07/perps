@@ -1,5 +1,8 @@
 {
-  "name": "db",
+  "name": "@repo/db",
+  "exports": {
+    ".": "./index.ts"
+  },
   "private": true,
   "devDependencies": {
     "@types/bun": "latest",
