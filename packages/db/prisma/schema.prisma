@@ -11,3 +11,80 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+model User {
+  id         String  @id @default(uuid())
+  username   String  @unique
+  password   String
+  orders     Order[]
+  makerFills Fill[]  @relation("makerFills")
+  takerFills Fill[]  @relation("takerFills")
+}
+
+model Market {
+  id       String @id @default(uuid())
+  slug     String
+  imageUrl String
+}
+
+model Order {
+  id       String    @id @default(uuid())
+  userId   String
+  marketId String
+  type     OrderType
+  side     Side
+
+  price         BigInt
+  slippage      Int?
+  qty           BigInt
+  filledQty     BigInt
+  initialMargin BigInt
+
+  status    OrderStatus
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt()
+
+  makerFills Fill[] @relation("makerFills")
+  takerFills Fill[] @relation("takerFills")
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Fill {
+  id String @id @default(uuid())
+
+  makerId String
+  takerId String
+
+  qty   BigInt
+  price BigInt
+
+  makerOrderId String
+  takerOrderId String
+  marketId     String
+
+  createdAt DateTime @default(now())
+
+  makerOrder Order @relation("makerFills", fields: [makerOrderId], references: [id])
+  takerOrder Order @relation("takerFills", fields: [takerOrderId], references: [id])
+
+  makerUser User @relation("makerFills", fields: [makerId], references: [id])
+  takerUser User @relation("takerFills", fields: [takerId], references: [id])
+}
+
+enum OrderStatus {
+  FILLED
+  PARTIALLY_FILLED
+  CANCELLED
+  OPEN
+}
+
+enum OrderType {
+  MARKET
+  LIMIT
+}
+
+enum Side {
+  BID
+  ASK
+}
