@@ -29,6 +29,7 @@
       },
       "devDependencies": {
         "@repo/db": "workspace:*",
+        "@repo/types": "workspace:*",
         "@types/bun": "latest",
       },
       "peerDependencies": {
@@ -38,9 +39,11 @@
     "apps/engine": {
       "name": "engine",
       "dependencies": {
+        "dotenv": "^17.4.2",
         "redis": "^6.0.0",
       },
       "devDependencies": {
+        "@repo/types": "workspace:*",
         "@types/bun": "latest",
       },
       "peerDependencies": {
@@ -75,6 +78,15 @@
         "globals": "^16.5.0",
         "typescript": "^5.9.2",
         "typescript-eslint": "^8.50.0",
+      },
+    },
+    "packages/types": {
+      "name": "@repo/types",
+      "devDependencies": {
+        "@types/bun": "latest",
+      },
+      "peerDependencies": {
+        "typescript": "^5",
       },
     },
     "packages/typescript-config": {
@@ -216,6 +228,8 @@
     "@repo/db": ["@repo/db@workspace:packages/db"],
 
     "@repo/eslint-config": ["@repo/eslint-config@workspace:packages/eslint-config"],
+
+    "@repo/types": ["@repo/types@workspace:packages/types"],
 
     "@repo/typescript-config": ["@repo/typescript-config@workspace:packages/typescript-config"],
 
