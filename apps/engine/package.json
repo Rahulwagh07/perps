@@ -2,6 +2,9 @@
   "name": "engine",
   "private": true,
   "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts"
+  },
   "devDependencies": {
     "@types/bun": "latest",
     "@repo/types": "workspace:*"

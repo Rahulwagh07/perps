@@ -8,3 +8,11 @@ export const createOrderSchema = z.object({
   marketId: z.string(),
   initialMargin: z.number().positive(),
 })
+
+export const deleteOrderSchema = z.object({
+  orderId: z.string().min(1, 'Order id is required'),
+})
+
+export const getOrderSchema = z.object({
+  orderId: z.string().min(1, 'Order id is required'),
+})

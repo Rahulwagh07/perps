@@ -5,6 +5,7 @@ import type {
   Balance,
   Position,
   CreateOrderStreamMessage,
+  MakerOrderUpdate,
 } from '@repo/types'
 
 export type OrderMatchResult =
@@ -14,7 +15,14 @@ export type OrderMatchResult =
       filledQty: bigint
       status: 'FILLED' | 'PARTIALLY_FILLED' | 'OPEN'
       fills: Fill[]
+      fullyFilledMakerORderIds: string[]
+      addedToBook: boolean
+      makerOrderUpdates: MakerOrderUpdate[]
     }
+
+export type CancelResult =
+  | { success: false; reason: string }
+  | { success: true; marginReturned: bigint }
 
 function calculateLiquidationPrice(
   averagePrice: bigint,
@@ -166,6 +174,7 @@ export function processOrder(
 
   const available = BigInt(balance.available)
   const margin = BigInt(msg.initialMargin)
+  const makerOrderUpdates: MakerOrderUpdate[] = []
 
   if (available < margin) {
     return {
@@ -189,6 +198,7 @@ export function processOrder(
   const fills: Fill[] = []
   let remainingQty = BigInt(msg.qty)
   const incomingPrice = BigInt(msg.price)
+  const fullyFilledMakerORderIds: string[] = []
 
   //buy orders
   if (msg.side === 'BID') {
@@ -258,6 +268,21 @@ export function processOrder(
         level.availableQty -= fillQty
         remainingQty -= fillQty
         ob.lastTradedPrice = Number(askPrice)
+        if (askOrder.filledQty === askOrder.qty) {
+          fullyFilledMakerORderIds.push(askOrder.orderId)
+
+          makerOrderUpdates.push({
+            orderId: askOrder.orderId,
+            filledQty: askOrder.filledQty.toString(),
+            status: 'FILLED',
+          })
+        } else {
+          makerOrderUpdates.push({
+            orderId: askOrder.orderId,
+            filledQty: askOrder.filledQty.toString(),
+            status: 'PARTIALLY_FILLED',
+          })
+        }
       }
 
       level.orders = level.orders.filter(o => o.filledQty < o.qty)
@@ -352,6 +377,21 @@ export function processOrder(
         level.availableQty -= fillQty
         remainingQty -= fillQty
         ob.lastTradedPrice = Number(bidPrice)
+
+        if (bidOrder.filledQty === bidOrder.qty) {
+          fullyFilledMakerORderIds.push(bidOrder.orderId)
+          makerOrderUpdates.push({
+            orderId: bidOrder.orderId,
+            filledQty: bidOrder.filledQty.toString(),
+            status: 'FILLED',
+          })
+        } else {
+          makerOrderUpdates.push({
+            orderId: bidOrder.orderId,
+            filledQty: bidOrder.filledQty.toString(),
+            status: 'PARTIALLY_FILLED',
+          })
+        }
       }
 
       level.orders = level.orders.filter(o => o.filledQty < o.qty)
@@ -390,5 +430,90 @@ export function processOrder(
         ? 'PARTIALLY_FILLED'
         : 'OPEN'
 
-  return { success: true, filledQty, status, fills }
+  const addedToBook = remainingQty > 0n && msg.type === 'LIMIT'
+
+  return {
+    success: true,
+    filledQty,
+    status,
+    fills,
+    fullyFilledMakerORderIds,
+    addedToBook,
+    makerOrderUpdates,
+  }
+}
+
+export type OrderIndexEntry = {
+  marketId: string
+  side: 'BID' | 'ASK'
+  price: string
+}
+
+export function cancelOrder(
+  orderId: string,
+  userId: string,
+  orderIndex: Map<string, OrderIndexEntry>,
+  orderbooks: Map<string, Orderbook>,
+  balances: Map<string, Balance>
+): CancelResult {
+  const indexEntry = orderIndex.get(orderId)
+  if (!indexEntry) {
+    return {
+      success: false,
+      reason: 'order not found',
+    }
+  }
+
+  const ob = orderbooks.get(indexEntry.marketId)
+  if (!ob) {
+    return {
+      success: false,
+      reason: 'orderbook not found',
+    }
+  }
+
+  const side = indexEntry.side === 'BID' ? ob.bids : ob.asks
+  const level = side.get(indexEntry.price)
+  if (!level) {
+    return {
+      success: false,
+      reason: 'price level not found',
+    }
+  }
+
+  const order = level.orders.find(o => o.orderId === orderId)
+  if (!order) {
+    return {
+      success: false,
+      reason: 'order not found in price level',
+    }
+  }
+
+  if (order.userId !== userId) {
+    return {
+      success: false,
+      reason: 'only owner can cancel the order',
+    }
+  }
+  const unfilledQty = order.qty - order.filledQty
+
+  const marginToReturn = (order.initialMargin * unfilledQty) / order.qty
+
+  level.orders = level.orders.filter(o => o.orderId !== orderId)
+  level.availableQty -= unfilledQty
+  if (level.availableQty === 0n) {
+    side.delete(indexEntry.price)
+  }
+
+  const balance = balances.get(userId)
+  if (balance) {
+    balance.available = (BigInt(balance.available) + marginToReturn).toString()
+    balance.locked = (BigInt(balance.locked) - marginToReturn).toString()
+  }
+
+  orderIndex.delete(orderId)
+  return {
+    success: true,
+    marginReturned: marginToReturn,
+  }
 }

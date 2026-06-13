@@ -16,9 +16,10 @@ export type CreateOrderStreamMessage = {
 
 export type EngineResponse = {
   identifier: string
-  oderId: string
-  filledQty: string
-  status: OrderStatus
+  orderId?: string
+  filledQty?: string
+  status?: OrderStatus
+  error?: string
 }
 
 export type FillStreamMessage = {
@@ -32,8 +33,9 @@ export type FillStreamMessage = {
 
 export type DepthUpdate = {
   marketId: string
-  bids: [string, string[]]
-  asks: [string, string[]]
+  bids: [string, string][]
+  asks: [string, string][]
+  lastTradedPrice: number
 }
 
 export type CancelOrderStreamMessage = {
@@ -44,6 +46,28 @@ export type CancelOrderStreamMessage = {
   queueId: string
 }
 
+export type MarkPriceUpdateMessage = {
+  msgType: 'MARK_PRICE_UPDATE'
+  marketId: string
+  markPrice: string
+}
+
+export type DepositStreamMessage = {
+  msgType: 'DEPOSIT'
+  userId: string
+  amount: string
+  identifier: string
+  queueId: string
+}
+
 export type OrderStreamMessage =
   | CreateOrderStreamMessage
   | CancelOrderStreamMessage
+  | MarkPriceUpdateMessage
+  | DepositStreamMessage
+
+export type MakerOrderUpdate = {
+  orderId: string
+  filledQty: string
+  status: 'FILLED' | 'PARTIALLY_FILLED'
+}

@@ -1,10 +1,7 @@
 {
-  "name": "backend",
+  "name": "poller",
   "module": "index.ts",
   "type": "module",
-  "scripts": {
-    "dev": "bun --watch src/index.ts"
-  },
   "private": true,
   "devDependencies": {
     "@types/bun": "latest",
@@ -14,14 +11,8 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "@types/express": "^5.0.6",
-    "@types/jsonwebtoken": "^9.0.10",
     "@repo/db": "workspace:*",
-    "bcryptjs": "^3.0.3",
     "dotenv": "^17.4.2",
-    "express": "^5.2.1",
-    "jsonwebtoken": "^9.0.3",
-    "redis": "^6.0.0",
-    "zod": "^4.4.3"
+    "redis": "^6.0.0"
   }
 }
