@@ -14,6 +14,8 @@ export async function GetFills(req: Request, res: Response) {
         ...fill,
         qty: fill.qty.toString(),
         price: fill.price.toString(),
+        makerFee: fill.makerFee.toString(),
+        takerFee: fill.takerFee.toString(),
       }))
     )
   } catch (error) {
