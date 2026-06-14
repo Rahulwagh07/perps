@@ -12,6 +12,7 @@ export type CreateOrderStreamMessage = {
   initialMargin: string
   identifier: string
   queueId: string
+  isLiquidation?: boolean
 }
 
 export type EngineResponse = {
@@ -50,6 +51,7 @@ export type MarkPriceUpdateMessage = {
   msgType: 'MARK_PRICE_UPDATE'
   marketId: string
   markPrice: string
+  indexPrice: string
 }
 
 export type DepositStreamMessage = {
@@ -70,4 +72,16 @@ export type MakerOrderUpdate = {
   orderId: string
   filledQty: string
   status: 'FILLED' | 'PARTIALLY_FILLED'
+}
+
+export type LiquidationEvent = {
+  userId: string
+  marketId: string
+  side: 'long' | 'short'
+  qty: string
+  entryPrice: string
+  markPrice: string
+  equity: string
+  surplus: string
+  deficit: string
 }

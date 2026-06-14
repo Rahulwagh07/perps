@@ -50,7 +50,7 @@ export async function CreateOrder(req: Request, res: Response) {
       queueId: QUEUE_ID,
     }
 
-    await redis.xAdd('orders:stream', '*', message as Record<string, string>)
+    await redis.xAdd('orders:stream', '*', message as unknown as Record<string, string>)
 
     const response = await waitForEngineResponse(QUEUE_ID, identifier)
 
@@ -184,7 +184,15 @@ export async function GetOrders(req: Request, res: Response) {
     const orders = await prisma.order.findMany({
       where: { userId: req.userId },
     })
-    return res.status(200).json(orders)
+    return res.status(200).json(
+      orders.map(order => ({
+        ...order,
+        price: order.price.toString(),
+        qty: order.qty.toString(),
+        filledQty: order.filledQty.toString(),
+        initialMargin: order.initialMargin.toString(),
+      }))
+    )
   } catch (error) {
     console.log('Error getting order', error)
     return res.status(500).json({

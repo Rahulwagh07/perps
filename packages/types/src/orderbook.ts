@@ -17,6 +17,7 @@ export type Orderbook = {
   asks: Map<string, PriceLevel>
   lastTradedPrice: number
   markPrice: number
+  indexPrice: number
 }
 
 export type Fill = {

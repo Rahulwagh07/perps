@@ -7,9 +7,8 @@ import type {
   CreateOrderStreamMessage,
   MakerOrderUpdate,
 } from '@repo/types'
-import { TAKER_FEE_BPS } from './constant'
-import { calculatedEstimatedFees, deductFees } from './utils';
-
+import { TAKER_FEE_BPS, INSURANCE_FEE_RATIO_BPS, BPS_DIVISOR } from './constant'
+import { calculatedEstimatedFees, deductFees } from './utils'
 
 export type OrderMatchResult =
   | { success: false; reason: string }
@@ -22,6 +21,7 @@ export type OrderMatchResult =
     addedToBook: boolean
     makerOrderUpdates: MakerOrderUpdate[]
     totalFeesCollected: bigint
+    insuranceContribution: bigint
   }
 
 export type CancelResult =
@@ -181,16 +181,22 @@ export function processOrder(
   const makerOrderUpdates: MakerOrderUpdate[] = []
   let totalFeesCollected = 0n
 
-  const estimatedFee = calculatedEstimatedFees(BigInt(msg.qty), BigInt(msg.price), TAKER_FEE_BPS);
+  if (!msg.isLiquidation) {
+    const estimatedFee = calculatedEstimatedFees(
+      BigInt(msg.qty),
+      BigInt(msg.price),
+      TAKER_FEE_BPS
+    )
 
-  if (available < margin + estimatedFee) {
-    return {
-      success: false,
-      reason: `insufficient balance`,
+    if (available < margin + estimatedFee) {
+      return {
+        success: false,
+        reason: `insufficient balance`,
+      }
     }
+    balance.available = (available - margin).toString()
+    balance.locked = (BigInt(balance.locked) + margin).toString()
   }
-  balance.available = (available - margin).toString()
-  balance.locked = (BigInt(balance.locked) + margin).toString()
 
   if (!orderbooks.has(msg.marketId)) {
     orderbooks.set(msg.marketId, {
@@ -198,6 +204,7 @@ export function processOrder(
       asks: new Map(),
       lastTradedPrice: 0,
       markPrice: 0,
+      indexPrice: 0,
     })
   }
 
@@ -226,8 +233,15 @@ export function processOrder(
         const fillQty =
           remainingQty < askAvailable ? remainingQty : askAvailable
 
-        const { takerFee, makerFee, total: feesCollected } = deductFees(
-          fillQty, askPrice, balance, balances.get(askOrder.userId)!
+        const {
+          takerFee,
+          makerFee,
+          total: feesCollected,
+        } = deductFees(
+          fillQty,
+          askPrice,
+          balance,
+          balances.get(askOrder.userId)!
         )
         totalFeesCollected += feesCollected
 
@@ -348,8 +362,15 @@ export function processOrder(
         const fillQty =
           remainingQty < bidAvailable ? remainingQty : bidAvailable
 
-        const { takerFee, makerFee, total: feesCollected } = deductFees(
-          fillQty, bidPrice, balance, balances.get(bidOrder.userId)!
+        const {
+          takerFee,
+          makerFee,
+          total: feesCollected,
+        } = deductFees(
+          fillQty,
+          bidPrice,
+          balance,
+          balances.get(bidOrder.userId)!
         )
         totalFeesCollected += feesCollected
 
@@ -453,6 +474,8 @@ export function processOrder(
 
   const addedToBook = remainingQty > 0n && msg.type === 'LIMIT'
 
+  const insuranceContribution = (totalFeesCollected * INSURANCE_FEE_RATIO_BPS) / BPS_DIVISOR
+
   return {
     success: true,
     filledQty,
@@ -462,6 +485,7 @@ export function processOrder(
     addedToBook,
     makerOrderUpdates,
     totalFeesCollected,
+    insuranceContribution,
   }
 }
 

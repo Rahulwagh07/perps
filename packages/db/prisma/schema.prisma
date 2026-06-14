@@ -13,12 +13,14 @@ datasource db {
 }
 
 model User {
-  id         String  @id @default(uuid())
-  username   String  @unique
-  password   String
-  orders     Order[]
-  makerFills Fill[]  @relation("makerFills")
-  takerFills Fill[]  @relation("takerFills")
+  id              String           @id @default(uuid())
+  username        String           @unique
+  password        String
+  orders          Order[]
+  makerFills      Fill[]           @relation("makerFills")
+  takerFills      Fill[]           @relation("takerFills")
+  liquidations    Liquidation[]
+  fundingPayments FundingPayment[]
 }
 
 model Market {
@@ -72,6 +74,38 @@ model Fill {
 
   makerUser User @relation("makerFills", fields: [makerId], references: [id])
   takerUser User @relation("takerFills", fields: [takerId], references: [id])
+}
+
+model Liquidation {
+  id String @id @default(uuid())
+
+  marketId   String
+  side       String
+  qty        BigInt
+  entryPrice BigInt
+  markPrice  BigInt
+
+  equity  BigInt
+  surplus BigInt @default(0)
+  deficit BigInt @default(0)
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model FundingPayment {
+  id String @id @default(uuid())
+
+  marketId String
+  side     String
+
+  amount      BigInt
+  fundingRate BigInt
+
+  userId   String
+  user     User     @relation(fields: [userId], references: [id])
+  createAt DateTime @default(now())
 }
 
 enum OrderStatus {

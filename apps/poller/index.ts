@@ -11,6 +11,7 @@ const redis = await createClient({
   .connect()
 
 const FILLS_STREAM = 'fills:stream'
+const FUNDING_STREAM = 'funding:stream'
 const GROUP_NAME = 'poller-group'
 const CONSUMER_NAME = `poller-${process.pid}`
 
@@ -23,14 +24,23 @@ async function init() {
     if (!err.message.includes('BUSYGROUP')) throw err
   }
 
+  try {
+    await redis.xGroupCreate(FUNDING_STREAM, GROUP_NAME, '0', {
+      MKSTREAM: true,
+    })
+  } catch (err: any) {
+    if (!err.message.includes('BUSYGROUP')) throw err
+  }
+
   //recover any fills that were read but not acked before a crash
-  await recoverPending()
+  await recoverPending(FILLS_STREAM)
+  await recoverPending(FUNDING_STREAM)
   await processLoop()
 }
 
-async function recoverPending() {
+async function recoverPending(streamName: string) {
   const result = await redis.xAutoClaim(
-    FILLS_STREAM,
+    streamName,
     GROUP_NAME,
     CONSUMER_NAME,
     0,
@@ -39,7 +49,11 @@ async function recoverPending() {
 
   for (const msg of result.messages) {
     if (!msg) continue
-    await writeFills(msg.id, msg.message as Record<string, string>)
+    if (streamName === FILLS_STREAM) {
+      await processStreamMessage(msg.id, msg.message as Record<string, string>)
+    } else if (streamName === FUNDING_STREAM) {
+      await processFundingMessage(msg.id, msg.message as Record<string, string>)
+    }
   }
 }
 
@@ -49,7 +63,10 @@ async function processLoop() {
     const streams = await redis.xReadGroup(
       GROUP_NAME,
       CONSUMER_NAME,
-      [{ key: FILLS_STREAM, id: '>' }],
+      [
+        { key: FILLS_STREAM, id: '>' },
+        { key: FUNDING_STREAM, id: '>' },
+      ],
       { COUNT: 5, BLOCK: 0 }
     )
 
@@ -57,69 +74,128 @@ async function processLoop() {
 
     for (const stream of streams) {
       for (const msg of stream.messages) {
-        await writeFills(msg.id, msg.message as Record<string, string>)
+        if (stream.name === FILLS_STREAM) {
+          await processStreamMessage(
+            msg.id,
+            msg.message as Record<string, string>
+          )
+        } else if (stream.name === FUNDING_STREAM) {
+          await processFundingMessage(
+            msg.id,
+            msg.message as Record<string, string>
+          )
+        }
       }
     }
   }
 }
 
-async function writeFills(messageId: string, fields: Record<string, string>) {
-  const fills: Fill[] = JSON.parse(fields.fills ?? '[]')
-  const makerOrderUpdates: MakerOrderUpdate[] = JSON.parse(
-    fields.makerOrderUpdates ?? '[]'
-  )
+async function processStreamMessage(
+  messageId: string,
+  fields: Record<string, string>
+) {
+  if (fields.orderId) {
+    const fills: Fill[] = JSON.parse(fields.fills ?? '[]')
+    const makerOrderUpdates: MakerOrderUpdate[] = JSON.parse(
+      fields.makerOrderUpdates ?? '[]'
+    )
 
-  const makerUpdateMap = new Map<string, MakerOrderUpdate>()
+    const makerUpdateMap = new Map<string, MakerOrderUpdate>()
 
-  for (const update of makerOrderUpdates) {
-    makerUpdateMap.set(update.orderId, update)
-  }
+    for (const update of makerOrderUpdates) {
+      makerUpdateMap.set(update.orderId, update)
+    }
 
-  console.log('FILLS', fills)
-  if (!fields.orderId || !fields.filledQty || !fields.status) {
-    throw new Error('invalid fill message')
-  }
-  await prisma.$transaction([
-    //write all fills
-    prisma.fill.createMany({
-      data: fills.map(f => ({
-        makerId: f.makerId,
-        takerId: f.takerId,
-        qty: BigInt(f.qty),
-        price: BigInt(f.price),
-        takerFee: BigInt(f.takerFee ?? '0'),
-        makerFee: BigInt(f.makerFee ?? '0'),
-        makerOrderId: f.makerOrderId,
-        takerOrderId: f.takerOrderId,
-        marketId: f.marketId,
-      })),
-    }),
+    console.log('FILLS', fills)
+    if (!fields.filledQty || !fields.status) {
+      throw new Error('invalid fill message')
+    }
 
-    //update takers order
-    prisma.order.update({
-      where: { id: fields.orderId },
-      data: {
-        filledQty: BigInt(fields.filledQty),
-        status: fields.status as OrderStatus,
-      },
-    }),
+    await prisma.$transaction([
+      //write all fills
+      prisma.fill.createMany({
+        data: fills.map(f => ({
+          makerId: f.makerId,
+          takerId: f.takerId,
+          qty: BigInt(f.qty),
+          price: BigInt(f.price),
+          takerFee: BigInt(f.takerFee ?? '0'),
+          makerFee: BigInt(f.makerFee ?? '0'),
+          makerOrderId: f.makerOrderId,
+          takerOrderId: f.takerOrderId,
+          marketId: f.marketId,
+        })),
+      }),
 
-    //update each makers order
-    ...Array.from(makerUpdateMap.values()).map(update =>
+      //update takers order
       prisma.order.update({
-        where: { id: update.orderId },
+        where: { id: fields.orderId },
         data: {
-          filledQty: BigInt(update.filledQty),
-          status: update.status as OrderStatus,
+          filledQty: BigInt(fields.filledQty),
+          status: fields.status as OrderStatus,
         },
-      })
-    ),
-  ])
+      }),
+
+      //update each makers order
+      ...Array.from(makerUpdateMap.values()).map(update =>
+        prisma.order.update({
+          where: { id: update.orderId },
+          data: {
+            filledQty: BigInt(update.filledQty),
+            status: update.status as OrderStatus,
+          },
+        })
+      ),
+    ])
+    console.log(`fills written to db for orderid: ${fields.orderId}`)
+  } else if (fields.userId && fields.surplus !== undefined) {
+    await prisma.liquidation.create({
+      data: {
+        userId: fields.userId,
+        marketId: fields.marketId || '',
+        side: fields.side || '',
+        qty: BigInt(fields.qty || '0'),
+        entryPrice: BigInt(fields.entryPrice || '0'),
+        markPrice: BigInt(fields.markPrice || '0'),
+        equity: BigInt(fields.equity || '0'),
+        surplus: BigInt(fields.surplus || '0'),
+        deficit: BigInt(fields.deficit || '0'),
+      },
+    })
+    console.log(`liquidation written to db for userId: ${fields.userId}`)
+  } else {
+    console.log('unknown stream message', fields)
+  }
 
   //ACK after db write are completed.
   //if not message stays pending and retires on recovery
   await redis.xAck(FILLS_STREAM, GROUP_NAME, messageId)
-  console.log(`fills written to db for orderid: ${fields.orderId}`)
+}
+
+async function processFundingMessage(
+  messageId: string,
+  fields: Record<string, string>
+) {
+  console.log('funding fields', fields)
+
+  const payments: { userId: string; amount: string; side: string }[] =
+    JSON.parse(fields.payments ?? '[]')
+
+  if (payments.length > 0) {
+    await prisma.fundingPayment.createMany({
+      data: payments.map(p => ({
+        marketId: fields.marketId || '',
+        side: p.side,
+        amount: BigInt(p.amount || '0'),
+        fundingRate: BigInt(fields.fundingRate || '0'),
+        userId: p.userId,
+        createAt: new Date(Number(fields.timestamp || Date.now())),
+      })),
+    })
+    console.log(`funding payments written to db for market: ${fields.marketId}`)
+  }
+
+  await redis.xAck(FUNDING_STREAM, GROUP_NAME, messageId)
 }
 
 await init()

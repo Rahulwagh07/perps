@@ -11,9 +11,16 @@ import type {
 } from '@repo/types'
 import { createClient } from 'redis'
 import { getLatestSnapshot, takeSnapshot } from './snapshot'
-import { SNAPSHOT_INTERVAL } from './constant'
+import { FUNDING_INTERVAL_MS, SNAPSHOT_INTERVAL } from './constant'
 import { cancelOrder, processOrder, type OrderIndexEntry } from './orderbook'
 import { configDotenv } from 'dotenv'
+import {
+  buildLiquidationOrder,
+  calculateLiquidationResult,
+  findLiquidatablePositions,
+} from './liquidation'
+import { runADL } from './adl'
+import { calculateFundingRate, settleFunding } from './funding'
 configDotenv()
 
 console.log('redis url', process.env.REDIS_URL)
@@ -28,6 +35,8 @@ const positions = new Map<string, Map<string, Position>>()
 //to find and order without scanning every price level
 const orderIndex = new Map<string, OrderIndexEntry>()
 let totalFeesCollected = 0n
+let insuranceFund = 0n
+let lastFundingTimes = new Map<string, number>() //marketId -> last settelment time
 
 const ORDER_STREAM = 'orders:stream'
 const GROUP_NAME = 'engine-group'
@@ -80,6 +89,7 @@ async function init() {
         ),
         lastTradedPrice: rawOb.lastTradedPrice,
         markPrice: rawOb.markPrice,
+        indexPrice: rawOb.indexPrice ?? 0,
       }
       orderbooks.set(marketId, ob)
 
@@ -118,11 +128,27 @@ async function init() {
       totalFeesCollected = BigInt(snapshot.totalFeesCollected)
     }
 
+    if (snapshot.insuranceFund) {
+      insuranceFund = BigInt(snapshot.insuranceFund)
+    }
+
+    if (snapshot.lastFundingTimes) {
+      lastFundingTimes = new Map(Object.entries(snapshot.lastFundingTimes))
+    }
+
     console.log('recovered from snapshot')
   }
 
   setInterval(
-    () => takeSnapshot(orderbooks, balances, positions, totalFeesCollected),
+    () =>
+      takeSnapshot(
+        orderbooks,
+        balances,
+        positions,
+        totalFeesCollected,
+        insuranceFund,
+        lastFundingTimes
+      ),
     SNAPSHOT_INTERVAL
   )
 
@@ -175,128 +201,261 @@ async function handleMessage(
   const msgType = fields.msgType as OrderStreamMessage['msgType']
 
   if (msgType === 'CREATE_ORDER') {
-    const msg = fields as CreateOrderStreamMessage
-    const result = processOrder(msg, orderbooks, balances, positions)
+    await handleCreateOrder(messageId, fields)
+  } else if (msgType === 'CANCEL_ORDER') {
+    await handleCancelOrder(messageId, fields)
+  } else if (msgType === 'DEPOSIT') {
+    await handleDeposit(messageId, fields)
+  } else if (msgType === 'MARK_PRICE_UPDATE') {
+    await handleMarkPriceUpdate(messageId, fields)
+  }
+}
 
-    const responseKey = `response:${msg.queueId}:${msg.identifier}`
+async function handleCreateOrder(
+  messageId: string,
+  fields: Record<string, string>
+) {
+  const msg = fields as unknown as CreateOrderStreamMessage
+  const result = processOrder(msg, orderbooks, balances, positions)
 
-    if (!result.success) {
-      await redis.xAdd(responseKey, '*', {
-        identifier: msg.identifier,
-        orderId: msg.orderId,
-        filledQty: '0',
-        status: 'CANCELLED',
-        error: result.reason,
-      })
-      await redis.xAck(ORDER_STREAM, GROUP_NAME, messageId)
-      return
-    }
-    totalFeesCollected += result.totalFeesCollected
+  const responseKey = `response:${msg.queueId}:${msg.identifier}`
 
-    //maintain order index
-    if (result.addedToBook) {
-      orderIndex.set(msg.orderId, {
-        marketId: msg.marketId,
-        side: msg.side,
-        price: msg.price,
-      })
-    }
-
-    for (const filledOrderId of result.fullyFilledMakerORderIds) {
-      orderIndex.delete(filledOrderId)
-    }
-
-    // send response back to backend which send this request
+  if (!result.success) {
     await redis.xAdd(responseKey, '*', {
       identifier: msg.identifier,
       orderId: msg.orderId,
-      filledQty: result.filledQty.toString(),
-      status: result.status,
+      filledQty: '0',
+      status: 'CANCELLED',
+      error: result.reason,
     })
-    await redis.expire(responseKey, 30)
-    console.log('fills', result.fills)
-    if (result.fills.length > 0) {
-      await redis.xAdd('fills:stream', '*', {
-        orderId: msg.orderId,
-        userId: msg.userId,
-        marketId: msg.marketId,
-        filledQty: result.filledQty.toString(),
-        status: result.status,
-        fills: JSON.stringify(result.fills),
-        makerOrderUpdates: JSON.stringify(result.makerOrderUpdates),
-      })
-    }
-    //publish balance update for all affected users
-    const effectedUsers = new Set([
-      msg.userId,
-      ...result.fills.map(f => f.makerId),
-    ])
-    await publishDepth(msg.marketId)
     await redis.xAck(ORDER_STREAM, GROUP_NAME, messageId)
-  } else if (msgType === 'CANCEL_ORDER') {
-    const msg = fields as CancelOrderStreamMessage
-    const responseKey = `response:${msg.queueId}:${msg.identifier}`
+    return
+  }
+  totalFeesCollected += result.totalFeesCollected
+  insuranceFund += result.insuranceContribution
 
-    const result = cancelOrder(
-      msg.orderId,
-      msg.userId,
-      orderIndex,
-      orderbooks,
-      balances
-    )
+  //maintain order index
+  if (result.addedToBook) {
+    orderIndex.set(msg.orderId, {
+      marketId: msg.marketId,
+      side: msg.side,
+      price: msg.price,
+    })
+  }
 
-    if (!result.success) {
-      await redis.xAdd(responseKey, '*', {
-        identifier: msg.identifier,
-        error: result.reason,
-      })
-      await redis.xAck(ORDER_STREAM, GROUP_NAME, messageId)
-      return
-    }
+  for (const filledOrderId of result.fullyFilledMakerORderIds) {
+    orderIndex.delete(filledOrderId)
+  }
 
+  // send response back to backend which send this request
+  await redis.xAdd(responseKey, '*', {
+    identifier: msg.identifier,
+    orderId: msg.orderId,
+    filledQty: result.filledQty.toString(),
+    status: result.status,
+  })
+  await redis.expire(responseKey, 30)
+  console.log('fills', result.fills)
+  if (result.fills.length > 0) {
     await redis.xAdd('fills:stream', '*', {
       orderId: msg.orderId,
       userId: msg.userId,
-      filledQty: '0',
-      status: 'CANCELLED',
-      fills: JSON.stringify([]),
+      marketId: msg.marketId,
+      filledQty: result.filledQty.toString(),
+      status: result.status,
+      fills: JSON.stringify(result.fills),
+      makerOrderUpdates: JSON.stringify(result.makerOrderUpdates),
     })
+  }
+  //publish balance update for all affected users
+  const effectedUsers = new Set([
+    msg.userId,
+    ...result.fills.map(f => f.makerId),
+  ])
+  await publishDepth(msg.marketId)
+  await redis.xAck(ORDER_STREAM, GROUP_NAME, messageId)
+}
 
-    await publishBalance(msg.userId)
+async function handleCancelOrder(
+  messageId: string,
+  fields: Record<string, string>
+) {
+  const msg = fields as CancelOrderStreamMessage
+  const responseKey = `response:${msg.queueId}:${msg.identifier}`
 
+  const result = cancelOrder(
+    msg.orderId,
+    msg.userId,
+    orderIndex,
+    orderbooks,
+    balances
+  )
+
+  if (!result.success) {
     await redis.xAdd(responseKey, '*', {
       identifier: msg.identifier,
-      orderId: msg.orderId,
-      marginReturned: result.marginReturned.toString(),
+      error: result.reason,
     })
-  } else if (msgType === 'DEPOSIT') {
-    const msg = fields as DepositStreamMessage
-    const amount = BigInt(msg.amount)
-
-    const existing = balances.get(msg.userId) ?? { available: '0', locked: '0' }
-    existing.available = (BigInt(existing.available) + amount).toString()
-    balances.set(msg.userId, existing)
-
-    await publishBalance(msg.userId)
-
-    const responseKey = `response:${msg.queueId}:${msg.identifier}`
-
-    await redis.xAdd(responseKey, '*', {
-      identified: msg.identifier,
-      available: existing.available,
-      locked: existing.locked,
-    })
-
     await redis.xAck(ORDER_STREAM, GROUP_NAME, messageId)
-  } else if (msgType === 'MARK_PRICE_UPDATE') {
-    const msg = fields as MarkPriceUpdateMessage
-    const ob = orderbooks.get(msg.marketId)
-    if (ob && fields.markPrice) {
-      ob.markPrice = parseFloat(fields.markPrice)
+    return
+  }
+
+  await redis.xAdd('fills:stream', '*', {
+    orderId: msg.orderId,
+    userId: msg.userId,
+    filledQty: '0',
+    status: 'CANCELLED',
+    fills: JSON.stringify([]),
+  })
+
+  await publishBalance(msg.userId)
+
+  await redis.xAdd(responseKey, '*', {
+    identifier: msg.identifier,
+    orderId: msg.orderId,
+    marginReturned: result.marginReturned.toString(),
+  })
+}
+
+async function handleDeposit(
+  messageId: string,
+  fields: Record<string, string>
+) {
+  const msg = fields as DepositStreamMessage
+  const amount = BigInt(msg.amount)
+
+  const existing = balances.get(msg.userId) ?? { available: '0', locked: '0' }
+  existing.available = (BigInt(existing.available) + amount).toString()
+  balances.set(msg.userId, existing)
+
+  await publishBalance(msg.userId)
+
+  const responseKey = `response:${msg.queueId}:${msg.identifier}`
+
+  await redis.xAdd(responseKey, '*', {
+    identified: msg.identifier,
+    available: existing.available,
+    locked: existing.locked,
+  })
+
+  await redis.xAck(ORDER_STREAM, GROUP_NAME, messageId)
+}
+
+async function handleMarkPriceUpdate(
+  messageId: string,
+  fields: Record<string, string>
+) {
+  const msg = fields as MarkPriceUpdateMessage
+  const ob = orderbooks.get(msg.marketId)
+
+  if (!ob) {
+    await redis.xAck(ORDER_STREAM, GROUP_NAME, messageId)
+    return
+  }
+
+  const now = Date.now()
+  const lastFunding = lastFundingTimes.get(msg.marketId) ?? 0
+
+  if (now - lastFunding >= FUNDING_INTERVAL_MS) {
+    const fundingRate = calculateFundingRate(ob.markPrice, ob.indexPrice)
+    const fundingResult = settleFunding(
+      msg.marketId,
+      fundingRate,
+      BigInt(Math.round(ob.markPrice)),
+      positions,
+      balances
+    )
+
+    //publish funding payments
+    if (fundingResult.payments.length > 0) {
+      await redis.xAdd('funding:stream', '*', {
+        marketId: msg.marketId,
+        fundingRate: fundingRate.toString(),
+        payments: JSON.stringify(
+          fundingResult.payments.map(p => ({
+            ...p,
+            amount: p.amount.toString(),
+          }))
+        ),
+        timestamp: now.toString(),
+      })
     }
 
-    await redis.xAck(ORDER_STREAM, GROUP_NAME, messageId)
+    lastFundingTimes.set(msg.marketId, now)
+
+    console.log(`FUNDING: market:${msg.marketId}, rate: ${fundingRate}`)
   }
+
+  if (fields.markPrice && fields.indexPrice) {
+    ob.markPrice = parseFloat(fields.markPrice)
+    ob.indexPrice = parseFloat(fields.indexPrice)
+
+    //check liquidation
+    const liquidatable = findLiquidatablePositions(
+      msg.marketId,
+      BigInt(Math.round(ob.markPrice)),
+      positions
+    )
+
+    for (const liq of liquidatable) {
+      const pos = { ...liq.position }
+      const liqOrder = buildLiquidationOrder(
+        liq.userId,
+        msg.marketId,
+        liq.position,
+        Math.round(ob.markPrice).toString()
+      )
+      const result = processOrder(liqOrder, orderbooks, balances, positions)
+
+      if (result.success && result.fills.length > 0) {
+        const avgFillPrice = BigInt(result.fills[0]!.price)
+        const liqResult = calculateLiquidationResult(
+          pos,
+          avgFillPrice,
+          BigInt(pos.qty)
+        )
+
+        //surplus -> insurance fund
+        insuranceFund += liqResult.surplus
+
+        //deficit
+        //1)insurance fund
+        //2)ADL
+        if (liqResult.deficit > 0n) {
+          if (insuranceFund >= liqResult.deficit) {
+            insuranceFund -= liqResult.deficit
+          } else {
+            //trigger ADL
+            const uncoverdDeficit = liqResult.deficit - insuranceFund
+            insuranceFund = 0n
+            runADL(
+              msg.marketId,
+              pos.side,
+              uncoverdDeficit,
+              ob.markPrice.toString(),
+              positions,
+              balances
+            )
+          }
+        }
+        await redis.xAdd(`fills:stream`, '*', {
+          userId: liq.userId,
+          marketId: msg.marketId,
+          side: pos.side,
+          qty: pos.qty,
+          entryPrice: pos.averagePrice,
+          markPrice: ob.markPrice.toString(),
+          equity: pos.equity,
+          surplus: liqResult.surplus.toString(),
+          deficit: liqResult.deficit.toString(),
+        })
+
+        await publishBalance(liq.userId)
+      }
+    }
+  }
+
+  await redis.xAck(ORDER_STREAM, GROUP_NAME, messageId)
 }
 
 async function publishBalance(userId: string) {
