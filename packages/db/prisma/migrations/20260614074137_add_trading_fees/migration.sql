@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Fill" ADD COLUMN     "makerFee" BIGINT NOT NULL DEFAULT 0,
+ADD COLUMN     "takerFee" BIGINT NOT NULL DEFAULT 0;

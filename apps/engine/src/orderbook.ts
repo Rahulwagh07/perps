@@ -7,18 +7,22 @@ import type {
   CreateOrderStreamMessage,
   MakerOrderUpdate,
 } from '@repo/types'
+import { TAKER_FEE_BPS } from './constant'
+import { calculatedEstimatedFees, deductFees } from './utils';
+
 
 export type OrderMatchResult =
   | { success: false; reason: string }
   | {
-      success: true
-      filledQty: bigint
-      status: 'FILLED' | 'PARTIALLY_FILLED' | 'OPEN'
-      fills: Fill[]
-      fullyFilledMakerORderIds: string[]
-      addedToBook: boolean
-      makerOrderUpdates: MakerOrderUpdate[]
-    }
+    success: true
+    filledQty: bigint
+    status: 'FILLED' | 'PARTIALLY_FILLED' | 'OPEN'
+    fills: Fill[]
+    fullyFilledMakerORderIds: string[]
+    addedToBook: boolean
+    makerOrderUpdates: MakerOrderUpdate[]
+    totalFeesCollected: bigint
+  }
 
 export type CancelResult =
   | { success: false; reason: string }
@@ -175,8 +179,11 @@ export function processOrder(
   const available = BigInt(balance.available)
   const margin = BigInt(msg.initialMargin)
   const makerOrderUpdates: MakerOrderUpdate[] = []
+  let totalFeesCollected = 0n
 
-  if (available < margin) {
+  const estimatedFee = calculatedEstimatedFees(BigInt(msg.qty), BigInt(msg.price), TAKER_FEE_BPS);
+
+  if (available < margin + estimatedFee) {
     return {
       success: false,
       reason: `insufficient balance`,
@@ -219,6 +226,11 @@ export function processOrder(
         const fillQty =
           remainingQty < askAvailable ? remainingQty : askAvailable
 
+        const { takerFee, makerFee, total: feesCollected } = deductFees(
+          fillQty, askPrice, balance, balances.get(askOrder.userId)!
+        )
+        totalFeesCollected += feesCollected
+
         fills.push({
           makerId: askOrder.userId,
           takerId: msg.userId,
@@ -227,6 +239,8 @@ export function processOrder(
           makerOrderId: askOrder.orderId,
           takerOrderId: msg.orderId,
           marketId: msg.marketId,
+          takerFee: takerFee.toString(),
+          makerFee: makerFee.toString(),
         })
 
         //taker position update
@@ -334,6 +348,11 @@ export function processOrder(
         const fillQty =
           remainingQty < bidAvailable ? remainingQty : bidAvailable
 
+        const { takerFee, makerFee, total: feesCollected } = deductFees(
+          fillQty, bidPrice, balance, balances.get(bidOrder.userId)!
+        )
+        totalFeesCollected += feesCollected
+
         fills.push({
           makerId: bidOrder.userId,
           takerId: msg.userId,
@@ -342,6 +361,8 @@ export function processOrder(
           makerOrderId: bidOrder.orderId,
           takerOrderId: msg.orderId,
           marketId: msg.marketId,
+          takerFee: takerFee.toString(),
+          makerFee: makerFee.toString(),
         })
 
         // taker is selling (short)
@@ -440,6 +461,7 @@ export function processOrder(
     fullyFilledMakerORderIds,
     addedToBook,
     makerOrderUpdates,
+    totalFeesCollected,
   }
 }
 

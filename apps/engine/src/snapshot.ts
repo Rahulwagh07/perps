@@ -15,12 +15,14 @@ export type Snapshot = {
     }
   >
   positions: Record<string, Record<string, any>>
+  totalFeesCollected: string
 }
 
 export async function takeSnapshot(
   orderbooks: Map<string, Orderbook>,
   balances: Map<string, { available: string; locked: string }>,
-  positions: Map<string, Map<string, any>>
+  positions: Map<string, Map<string, any>>,
+  totalFeesCollected: bigint
 ) {
   await fs.mkdir(SNAPSHOT_DIR, {
     recursive: true,
@@ -71,6 +73,7 @@ export async function takeSnapshot(
         Object.fromEntries(m),
       ])
     ),
+    totalFeesCollected: totalFeesCollected.toString(),
   }
 
   const filename = `snapshot_${Date.now()}.json`

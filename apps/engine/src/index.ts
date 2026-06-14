@@ -27,6 +27,7 @@ const balances = new Map<string, Balance>()
 const positions = new Map<string, Map<string, Position>>()
 //to find and order without scanning every price level
 const orderIndex = new Map<string, OrderIndexEntry>()
+let totalFeesCollected = 0n
 
 const ORDER_STREAM = 'orders:stream'
 const GROUP_NAME = 'engine-group'
@@ -113,11 +114,15 @@ async function init() {
       positions.set(uid, new Map(Object.entries(userPositions as any)))
     }
 
+    if (snapshot.totalFeesCollected) {
+      totalFeesCollected = BigInt(snapshot.totalFeesCollected)
+    }
+
     console.log('recovered from snapshot')
   }
 
   setInterval(
-    () => takeSnapshot(orderbooks, balances, positions),
+    () => takeSnapshot(orderbooks, balances, positions, totalFeesCollected),
     SNAPSHOT_INTERVAL
   )
 
@@ -186,6 +191,7 @@ async function handleMessage(
       await redis.xAck(ORDER_STREAM, GROUP_NAME, messageId)
       return
     }
+    totalFeesCollected += result.totalFeesCollected
 
     //maintain order index
     if (result.addedToBook) {

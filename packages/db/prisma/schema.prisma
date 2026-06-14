@@ -56,8 +56,10 @@ model Fill {
   makerId String
   takerId String
 
-  qty   BigInt
-  price BigInt
+  qty      BigInt
+  price    BigInt
+  takerFee BigInt @default(0)
+  makerFee BigInt @default(0)
 
   makerOrderId String
   takerOrderId String

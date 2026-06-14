@@ -87,6 +87,8 @@ async function writeFills(messageId: string, fields: Record<string, string>) {
         takerId: f.takerId,
         qty: BigInt(f.qty),
         price: BigInt(f.price),
+        takerFee: BigInt(f.takerFee ?? '0'),
+        makerFee: BigInt(f.makerFee ?? '0'),
         makerOrderId: f.makerOrderId,
         takerOrderId: f.takerOrderId,
         marketId: f.marketId,

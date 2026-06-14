@@ -27,6 +27,8 @@ export type Fill = {
   price: string
   makerOrderId: string
   takerOrderId: string
+  takerFee: string
+  makerFee: string
 }
 
 export type Balance = {
