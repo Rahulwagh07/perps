@@ -36,3 +36,15 @@ export async function CreateMarket(req: Request, res: Response) {
     })
   }
 }
+
+export async function GetMarkets(req: Request, res: Response) {
+  try {
+    const markets = await prisma.market.findMany()
+    return res.status(200).json(markets)
+  } catch (error) {
+    console.log('get markets error', error)
+    return res.status(500).json({
+      message: 'internal server error',
+    })
+  }
+}

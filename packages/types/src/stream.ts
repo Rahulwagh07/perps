@@ -37,6 +37,8 @@ export type DepthUpdate = {
   bids: [string, string][]
   asks: [string, string][]
   lastTradedPrice: number
+  markPrice?: number
+  indexPrice?: number
 }
 
 export type CancelOrderStreamMessage = {

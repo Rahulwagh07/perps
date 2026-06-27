@@ -171,6 +171,11 @@ export function processOrder(
   balances: Map<string, Balance>,
   positions: Map<string, Map<string, Position>>
 ): OrderMatchResult {
+  if (msg.qty) msg.qty = Math.round(Number(msg.qty)).toString()
+  if (msg.price) msg.price = Math.round(Number(msg.price)).toString()
+  if (msg.initialMargin) msg.initialMargin = Math.round(Number(msg.initialMargin)).toString()
+
+
   const balance = balances.get(msg.userId)
   if (!balance) {
     return { success: false, reason: 'User balance not found' }

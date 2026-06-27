@@ -139,6 +139,10 @@ async function init() {
     console.log('recovered from snapshot')
   }
 
+  for (const marketId of orderbooks.keys()) {
+    await publishDepth(marketId)
+  }
+
   setInterval(
     () =>
       takeSnapshot(
@@ -272,6 +276,10 @@ async function handleCreateOrder(
     msg.userId,
     ...result.fills.map(f => f.makerId),
   ])
+  for (const uid of effectedUsers) {
+    await publishBalance(uid)
+    await publishPositions(uid)
+  }
   await publishDepth(msg.marketId)
   await redis.xAck(ORDER_STREAM, GROUP_NAME, messageId)
 }
@@ -346,11 +354,17 @@ async function handleMarkPriceUpdate(
   fields: Record<string, string>
 ) {
   const msg = fields as MarkPriceUpdateMessage
-  const ob = orderbooks.get(msg.marketId)
+  let ob = orderbooks.get(msg.marketId)
 
   if (!ob) {
-    await redis.xAck(ORDER_STREAM, GROUP_NAME, messageId)
-    return
+    ob = {
+      bids: new Map(),
+      asks: new Map(),
+      lastTradedPrice: 0,
+      markPrice: 0,
+      indexPrice: 0,
+    }
+    orderbooks.set(msg.marketId, ob)
   }
 
   const now = Date.now()
@@ -449,12 +463,13 @@ async function handleMarkPriceUpdate(
           surplus: liqResult.surplus.toString(),
           deficit: liqResult.deficit.toString(),
         })
-
         await publishBalance(liq.userId)
+        await publishPositions(liq.userId)
       }
     }
   }
 
+  await publishDepth(msg.marketId)
   await redis.xAck(ORDER_STREAM, GROUP_NAME, messageId)
 }
 
@@ -465,6 +480,25 @@ async function publishBalance(userId: string) {
     available: bal.available,
     locked: bal.locked,
   })
+}
+
+async function publishPositions(userId: string) {
+  const userPositions = positions.get(userId)
+  if (!userPositions) return
+
+  const posArray = Array.from(userPositions.entries()).map(
+    ([marketId, pos]) => ({
+      marketId,
+      side: pos.side,
+      qty: pos.qty.toString(),
+      averagePrice: pos.averagePrice.toString(),
+      equity: pos.equity.toString(),
+      liquidationPrice: pos.liquidationPrice.toString(),
+      unrealizedPnl: pos.unrealizedPnl.toString(),
+    })
+  )
+
+  await redis.set(`positions:${userId}`, JSON.stringify(posArray))
 }
 
 async function publishDepth(marketId: string) {
@@ -480,12 +514,12 @@ async function publishDepth(marketId: string) {
       .sort((a, b) => Number(BigInt(a[0]) - BigInt(b[0]))),
 
     lastTradedPrice: ob.lastTradedPrice,
+    markPrice: ob.markPrice,
+    indexPrice: ob.indexPrice,
   }
 
   //cache for backend reads
-  await redis.set(`depth:cache:${marketId}`, JSON.stringify(depth), {
-    EX: 30,
-  })
+  await redis.set(`depth:cache:${marketId}`, JSON.stringify(depth))
   await redis.publish(`depth:${marketId}`, JSON.stringify(depth))
 }
 await init()

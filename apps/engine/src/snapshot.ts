@@ -108,6 +108,18 @@ export async function takeSnapshot(
     JSON.stringify(snapshot)
   )
   console.log('SNAPSHOT SAVED..')
+
+  try {
+    const files = await fs.readdir(SNAPSHOT_DIR)
+    const snapshots = files.filter(
+      f => f.startsWith('snapshot_') && f !== filename
+    )
+    for (const file of snapshots) {
+      await fs.unlink(path.join(SNAPSHOT_DIR, file))
+    }
+  } catch (err) {
+    console.log('Failed to clean up old snapshots', err)
+  }
 }
 
 export async function getLatestSnapshot() {

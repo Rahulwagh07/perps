@@ -3,6 +3,7 @@ import { configDotenv } from 'dotenv'
 configDotenv()
 import type { Fill, MakerOrderUpdate, OrderStatus } from '@repo/types'
 import { prisma } from '@repo/db'
+import { startMarkPriceService } from './mark-price'
 
 const redis = await createClient({
   url: process.env.REDIS_URL,
@@ -148,6 +149,20 @@ async function processStreamMessage(
       ),
     ])
     console.log(`fills written to db for orderid: ${fields.orderId}`)
+
+    const affectedUsers = new Set<string>()
+    if (fields.userId) affectedUsers.add(fields.userId)
+    for (const f of fills) {
+      affectedUsers.add(f.makerId)
+      affectedUsers.add(f.takerId)
+    }
+
+    for (const userId of affectedUsers) {
+      await redis.publish(
+        `user:${userId}`,
+        JSON.stringify({ event: 'USER_UPDATE' })
+      )
+    }
   } else if (fields.userId && fields.surplus !== undefined) {
     await prisma.liquidation.create({
       data: {
@@ -198,4 +213,10 @@ async function processFundingMessage(
   await redis.xAck(FUNDING_STREAM, GROUP_NAME, messageId)
 }
 
-await init()
+const redisPublish = await createClient({
+  url: process.env.REDIS_URL,
+})
+  .on('error', err => console.log('Redis publish error', err))
+  .connect()
+
+await Promise.all([init(), startMarkPriceService(redisPublish)])

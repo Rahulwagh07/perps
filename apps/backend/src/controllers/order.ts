@@ -20,16 +20,37 @@ export async function CreateOrder(req: Request, res: Response) {
 
   try {
     const { type, side, price, qty, marketId, initialMargin } = result.data
+
+    if (type === 'limit') {
+      const depthCache = await redis.get(`depth:cache:${marketId}`)
+      if (depthCache) {
+        const depth = JSON.parse(depthCache)
+        const currentPrice = depth.lastTradedPrice || depth.markPrice || 0
+        if (currentPrice > 0) {
+          if (side === 'bid' && price > currentPrice) {
+            return res.status(400).json({
+              error: 'Buy limit price cannot be higher than current market price',
+            })
+          }
+          if (side === 'ask' && price < currentPrice) {
+            return res.status(400).json({
+              error: 'Sell limit price cannot be lower than current market price',
+            })
+          }
+        }
+      }
+    }
+
     const order = await prisma.order.create({
       data: {
         userId: req.userId,
         marketId,
         type: type === 'limit' ? 'LIMIT' : 'MARKET',
         side: side === 'bid' ? 'BID' : 'ASK',
-        price: BigInt(price),
-        qty: BigInt(qty),
+        price: BigInt(Math.round(price)),
+        qty: BigInt(Math.round(qty)),
         filledQty: 0n,
-        initialMargin: BigInt(initialMargin),
+        initialMargin: BigInt(Math.round(initialMargin)),
         status: 'OPEN',
       },
     })
@@ -43,14 +64,18 @@ export async function CreateOrder(req: Request, res: Response) {
       marketId,
       type: type === 'market' ? 'MARKET' : 'LIMIT',
       side: side === 'ask' ? 'ASK' : 'BID',
-      price: price.toString(),
-      qty: qty.toString(),
-      initialMargin: initialMargin.toString(),
+      price: Math.round(price).toString(),
+      qty: Math.round(qty).toString(),
+      initialMargin: Math.round(initialMargin).toString(),
       identifier,
       queueId: QUEUE_ID,
     }
 
-    await redis.xAdd('orders:stream', '*', message as unknown as Record<string, string>)
+    await redis.xAdd(
+      'orders:stream',
+      '*',
+      message as unknown as Record<string, string>
+    )
 
     const response = await waitForEngineResponse(QUEUE_ID, identifier)
 
@@ -62,6 +87,10 @@ export async function CreateOrder(req: Request, res: Response) {
         where: { id: order.id },
         data: { status: 'CANCELLED' },
       })
+      await redis.publish(
+        `user:${req.userId}`,
+        JSON.stringify({ event: 'USER_UPDATE' })
+      )
       return res.status(501).json({
         error: 'engine timeout',
       })
@@ -69,6 +98,18 @@ export async function CreateOrder(req: Request, res: Response) {
 
     const engineResponse = response as EngineResponse
     console.log('ENGINRESPONSE', engineResponse)
+
+    if (engineResponse.status === 'CANCELLED') {
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { status: 'CANCELLED' },
+      })
+    }
+
+    await redis.publish(
+      `user:${req.userId}`,
+      JSON.stringify({ event: 'USER_UPDATE' })
+    )
 
     return res.status(200).json({
       engineResponse,
@@ -128,6 +169,11 @@ export async function DeleteOrder(req: Request, res: Response) {
     if (response.error) {
       return res.status(400).json({ error: response.error })
     }
+
+    await redis.publish(
+      `user:${req.userId}`,
+      JSON.stringify({ event: 'USER_UPDATE' })
+    )
 
     return res.status(200).json({
       orderId,

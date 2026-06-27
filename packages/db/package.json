@@ -4,6 +4,9 @@
     ".": "./index.ts"
   },
   "private": true,
+  "scripts": {
+    "seed": "bun seed.ts"
+  },
   "devDependencies": {
     "@types/bun": "latest",
     "dotenv": "^17.4.2"
