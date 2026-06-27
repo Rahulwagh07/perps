@@ -30,6 +30,7 @@ export function Chart() {
       layout: {
         background: { color: 'transparent' },
         textColor: '#A1A1AA',
+        attributionLogo: false,
       },
       grid: {
         vertLines: { color: '#27272A' },
