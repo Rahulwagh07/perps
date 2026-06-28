@@ -41,54 +41,58 @@ export function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
+    <div className="flex min-h-screen items-center justify-center p-4 bg-zinc-950">
       <Card className="w-full max-w-sm border-zinc-800 bg-zinc-900/50 backdrop-blur-xl">
-        <CardHeader className="space-y-1">
+        <CardHeader className="space-y-1 text-center">
           <CardTitle className="text-2xl font-bold tracking-tight">
             Login
           </CardTitle>
           <CardDescription className="text-zinc-400">
-            Enter your username to sign in to your account
+            Perpetual Futures Exchange
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleLogin}>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
+            <div className="space-y-2 text-left">
               <Label htmlFor="username">Username</Label>
               <Input
                 id="username"
                 type="text"
-                placeholder="johndoe"
+                placeholder="Enter username"
                 required
                 value={username}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  setUsername(e.target.value)
-                }
+                onChange={e => setUsername(e.target.value)}
                 className="bg-zinc-950 border-zinc-800 focus-visible:ring-zinc-700"
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 text-left">
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
                 type="password"
+                placeholder="Enter password"
                 required
                 value={password}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  setPassword(e.target.value)
-                }
+                onChange={e => setPassword(e.target.value)}
                 className="bg-zinc-950 border-zinc-800 focus-visible:ring-zinc-700"
               />
             </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Logging in...' : 'Sign In'}
+            <Button
+              type="submit"
+              className="w-full bg-zinc-100 text-zinc-900 hover:bg-zinc-200 font-semibold"
+              disabled={loading}
+            >
+              {loading ? 'Logging in...' : 'Login'}
             </Button>
             <div className="text-sm text-center text-zinc-400">
               Don't have an account?{' '}
-              <Link to="/signup" className="text-zinc-50 hover:underline">
-                Sign up
+              <Link
+                to="/signup"
+                className="text-zinc-50 hover:underline transition-colors"
+              >
+                Create account
               </Link>
             </div>
           </CardFooter>
