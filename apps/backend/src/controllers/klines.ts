@@ -1,13 +1,15 @@
 import { prisma } from '@repo/db'
 import type { Request, Response } from 'express'
 import { NUMBER_SCALE } from '@repo/types'
+import { klinesSchema } from '../schema/klines-schema'
 
 export async function GetKlines(req: Request, res: Response) {
   try {
-    const { marketId, interval } = req.query
-    if (!marketId || typeof marketId !== 'string') {
-      return res.status(400).json({ error: 'invalid marketId' })
+    const result = klinesSchema.safeParse(req.query)
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.issues })
     }
+    const { marketId, interval } = result.data
 
     let intervalMs = 60 * 1000 // default 1m
     if (interval === '5m') intervalMs = 5 * 60 * 1000
