@@ -1,0 +1,2 @@
+export const DEFAULT_SLIPPAGE_BPS = 200
+export const SLIPPAGE_OPTIONS_BPS = [50, 100, 200, 500]

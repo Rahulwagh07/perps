@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { useWebSocket } from '../../hooks/useWebSocket'
 import { Slider } from '@/components/ui/slider'
-import { fromScale } from '../../lib/utils'
+import { fromScale, calculateLiquidationPrice } from '../../lib/utils'
+import { DEFAULT_SLIPPAGE_BPS, SLIPPAGE_OPTIONS_BPS } from '../../lib/constants'
 
 export function OrderEntry() {
   const { activeMarket } = useMarketStore()
@@ -19,13 +20,16 @@ export function OrderEntry() {
   const [quantity, setQuantity] = useState('')
   const [leverage, setLeverage] = useState(1.1)
   const [loading, setLoading] = useState(false)
+  const [slippage, setSlippage] = useState(DEFAULT_SLIPPAGE_BPS)
 
   const getEstimatedPrice = () => {
     if (type === 'limit' && price) {
       return Number(price)
     }
 
-    const lastTradedPrice = depth.lastTradedPrice ? fromScale(depth.lastTradedPrice) : 0
+    const lastTradedPrice = depth.lastTradedPrice
+      ? fromScale(depth.lastTradedPrice)
+      : 0
     const currentPrice = lastTradedPrice || depth.markPrice || 0
 
     if (type === 'limit') {
@@ -36,7 +40,8 @@ export function OrderEntry() {
       }
     }
 
-    if (side === 'buy' && depth.asks.length > 0) return fromScale(Number(depth.asks[0][0]))
+    if (side === 'buy' && depth.asks.length > 0)
+      return fromScale(Number(depth.asks[0][0]))
     if (side === 'sell' && depth.bids.length > 0)
       return fromScale(Number(depth.bids[0][0]))
 
@@ -64,6 +69,7 @@ export function OrderEntry() {
         price: estimatedPrice,
         qty: Number(quantity),
         initialMargin: (Number(quantity) * estimatedPrice) / leverage || 1,
+        slippage: type === 'market' ? slippage : undefined,
       })
 
       if (response.data?.engineResponse?.status === 'CANCELLED') {
@@ -173,7 +179,7 @@ export function OrderEntry() {
         </div>
       </div>
 
-      <div className="space-y-4 flex-1">
+      <div className="space-y-4">
         <div className="space-y-1.5">
           <div className="flex justify-between items-center text-xs text-zinc-400">
             <label>Amount ({activeMarket.slug.split(/[-_]/)[0]})</label>
@@ -255,8 +261,18 @@ export function OrderEntry() {
         </div>
       </div>
 
+      <OrderSummary
+        type={type}
+        side={side}
+        leverage={leverage}
+        quantity={quantity}
+        slippage={slippage}
+        setSlippage={setSlippage}
+        estimatedPrice={getEstimatedPrice()}
+      />
+
       <Button
-        className={`w-full h-12 font-bold text-lg mt-4 ${
+        className={`w-full h-12 font-bold text-lg mt-2 ${
           side === 'buy'
             ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
             : 'bg-red-500 hover:bg-red-600 text-white'
@@ -266,6 +282,68 @@ export function OrderEntry() {
       >
         {side === 'buy' ? 'Buy / Long' : 'Sell / Short'}
       </Button>
+    </div>
+  )
+}
+
+function OrderSummary({
+  type,
+  side,
+  leverage,
+  quantity,
+  slippage,
+  setSlippage,
+  estimatedPrice,
+}: {
+  type: 'market' | 'limit'
+  side: 'buy' | 'sell'
+  leverage: number
+  quantity: string
+  slippage: number
+  setSlippage: (val: number) => void
+  estimatedPrice: number
+}) {
+  return (
+    <div className="space-y-2 mt-4 mb-2 pt-4 border-t border-zinc-800">
+      <div className="flex justify-between text-xs">
+        <span className="text-zinc-400">Entry Price</span>
+        <span className="text-zinc-200 font-mono">
+          ${estimatedPrice.toFixed(2)}
+        </span>
+      </div>
+      <div className="flex justify-between text-xs">
+        <span className="text-zinc-400">Liquidation Price</span>
+        <span className="text-zinc-200 font-mono">
+          $
+          {calculateLiquidationPrice(side, estimatedPrice, leverage).toFixed(2)}
+        </span>
+      </div>
+      {type === 'market' && (
+        <div className="flex justify-between text-xs items-center">
+          <span className="text-zinc-400">Slippage</span>
+          <div className="flex gap-1.5">
+            {SLIPPAGE_OPTIONS_BPS.map(val => (
+              <span
+                key={val}
+                onClick={() => setSlippage(val)}
+                className={`cursor-pointer px-1.5 py-0.5 rounded font-mono border ${
+                  slippage === val
+                    ? 'bg-zinc-800 text-zinc-100 border-zinc-700'
+                    : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                {val / 100}%
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="flex justify-between text-xs">
+        <span className="text-zinc-400">Total Fees</span>
+        <span className="text-zinc-200 font-mono">
+          ≈ ${(estimatedPrice * (Number(quantity) || 0) * 0.0004).toFixed(4)}
+        </span>
+      </div>
     </div>
   )
 }

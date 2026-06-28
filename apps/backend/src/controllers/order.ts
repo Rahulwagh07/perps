@@ -20,7 +20,7 @@ export async function CreateOrder(req: Request, res: Response) {
   }
 
   try {
-    const { type, side, price, qty, marketId, initialMargin } = result.data
+    const { type, side, price, qty, marketId, initialMargin, slippage } = result.data
 
     if (type === 'limit') {
       const depthCache = await redis.get(`depth:cache:${marketId}`)
@@ -54,6 +54,7 @@ export async function CreateOrder(req: Request, res: Response) {
         qty: BigInt(Math.round(qty * NUMBER_SCALE)),
         filledQty: 0n,
         initialMargin: BigInt(Math.round(initialMargin * NUMBER_SCALE)),
+        slippage: slippage ?? null,
         status: 'OPEN',
       },
     })
@@ -70,6 +71,7 @@ export async function CreateOrder(req: Request, res: Response) {
       price: Math.round(price * NUMBER_SCALE).toString(),
       qty: Math.round(qty * NUMBER_SCALE).toString(),
       initialMargin: Math.round(initialMargin * NUMBER_SCALE).toString(),
+      slippage: slippage?.toString(),
       identifier,
       queueId: QUEUE_ID,
     }

@@ -228,6 +228,10 @@ export function processOrder(
     for (const askPrice of sortedAskPrices) {
       if (remainingQty === 0n) break
       if (msg.type === 'LIMIT' && askPrice > incomingPrice) break
+      if (msg.type === 'MARKET' && msg.slippage) {
+        const maxPrice = incomingPrice + (incomingPrice * BigInt(msg.slippage)) / BPS_DIVISOR
+        if (askPrice > maxPrice) break
+      }
 
       const level = ob.asks.get(askPrice.toString())!
 
@@ -363,6 +367,10 @@ export function processOrder(
     for (const bidPrice of sortedBidPrices) {
       if (remainingQty === 0n) break
       if (msg.type === 'LIMIT' && bidPrice < incomingPrice) break
+      if (msg.type === 'MARKET' && msg.slippage) {
+        const minPrice = incomingPrice - (incomingPrice * BigInt(msg.slippage)) / BPS_DIVISOR
+        if (bidPrice < minPrice) break
+      }
 
       const level = ob.bids.get(bidPrice.toString())!
 

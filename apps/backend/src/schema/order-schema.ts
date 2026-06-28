@@ -7,6 +7,7 @@ export const createOrderSchema = z.object({
   qty: z.number().positive(),
   marketId: z.string(),
   initialMargin: z.number().positive(),
+  slippage: z.number().nonnegative().optional(),
 })
 
 export const deleteOrderSchema = z.object({

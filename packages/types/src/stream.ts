@@ -13,6 +13,7 @@ export type CreateOrderStreamMessage = {
   identifier: string
   queueId: string
   isLiquidation?: boolean
+  slippage?: string
 }
 
 export type EngineResponse = {

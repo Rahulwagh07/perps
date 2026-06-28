@@ -20,3 +20,15 @@ export const formatPrice = (price: string | number) => {
 export const formatQty = (qty: string | number) => {
   return fromScale(qty).toFixed(4)
 }
+
+export const calculateLiquidationPrice = (
+  side: 'buy' | 'sell',
+  entryPrice: number,
+  leverage: number,
+  maintenanceMarginRatio: number = 0.005
+): number => {
+  if (side === 'buy') {
+    return (entryPrice * (1 - 1 / leverage)) / (1 - maintenanceMarginRatio)
+  }
+  return (entryPrice * (1 + 1 / leverage)) / (1 + maintenanceMarginRatio)
+}
