@@ -5,6 +5,14 @@ import type { Fill, MakerOrderUpdate, OrderStatus } from '@repo/types'
 import { prisma } from '@repo/db'
 import { startMarkPriceService } from './mark-price'
 
+const safeBigInt = (val: string | undefined): bigint => {
+  if (!val) return BigInt(0)
+  try {
+    return BigInt(val)
+  } catch {
+    return BigInt(0)
+  }
+}
 const redis = await createClient({
   url: process.env.REDIS_URL,
 })
@@ -112,43 +120,50 @@ async function processStreamMessage(
       throw new Error('invalid fill message')
     }
 
-    await prisma.$transaction([
-      //write all fills
-      prisma.fill.createMany({
-        data: fills.map(f => ({
-          makerId: f.makerId,
-          takerId: f.takerId,
-          qty: BigInt(f.qty),
-          price: BigInt(f.price),
-          takerFee: BigInt(f.takerFee ?? '0'),
-          makerFee: BigInt(f.makerFee ?? '0'),
-          makerOrderId: f.makerOrderId,
-          takerOrderId: f.takerOrderId,
-          marketId: f.marketId,
-        })),
-      }),
+    try {
+      await prisma.$transaction([
+        //write all fills
+        prisma.fill.createMany({
+          data: fills.map(f => ({
+            makerId: f.makerId,
+            takerId: f.takerId,
+            qty: BigInt(f.qty),
+            price: BigInt(f.price),
+            takerFee: BigInt(f.takerFee ?? '0'),
+            makerFee: BigInt(f.makerFee ?? '0'),
+            makerOrderId: f.makerOrderId,
+            takerOrderId: f.takerOrderId,
+            marketId: f.marketId,
+          })),
+        }),
 
-      //update takers order
-      prisma.order.update({
-        where: { id: fields.orderId },
-        data: {
-          filledQty: BigInt(fields.filledQty),
-          status: fields.status as OrderStatus,
-        },
-      }),
-
-      //update each makers order
-      ...Array.from(makerUpdateMap.values()).map(update =>
+        //update takers order
         prisma.order.update({
-          where: { id: update.orderId },
+          where: { id: fields.orderId },
           data: {
-            filledQty: BigInt(update.filledQty),
-            status: update.status as OrderStatus,
+            filledQty: BigInt(fields.filledQty),
+            status: fields.status as OrderStatus,
           },
-        })
-      ),
-    ])
-    console.log(`fills written to db for orderid: ${fields.orderId}`)
+        }),
+
+        //update each makers order
+        ...Array.from(makerUpdateMap.values()).map(update =>
+          prisma.order.update({
+            where: { id: update.orderId },
+            data: {
+              filledQty: BigInt(update.filledQty),
+              status: update.status as OrderStatus,
+            },
+          })
+        ),
+      ])
+      console.log(`fills written to db for orderid: ${fields.orderId}`)
+    } catch (error) {
+      console.error(
+        `failed to write fills for orderId: ${fields.orderId}`,
+        error
+      )
+    }
 
     const affectedUsers = new Set<string>()
     if (fields.userId) affectedUsers.add(fields.userId)
@@ -164,20 +179,27 @@ async function processStreamMessage(
       )
     }
   } else if (fields.userId && fields.surplus !== undefined) {
-    await prisma.liquidation.create({
-      data: {
-        userId: fields.userId,
-        marketId: fields.marketId || '',
-        side: fields.side || '',
-        qty: BigInt(fields.qty || '0'),
-        entryPrice: BigInt(fields.entryPrice || '0'),
-        markPrice: BigInt(fields.markPrice || '0'),
-        equity: BigInt(fields.equity || '0'),
-        surplus: BigInt(fields.surplus || '0'),
-        deficit: BigInt(fields.deficit || '0'),
-      },
-    })
-    console.log(`liquidation written to db for userId: ${fields.userId}`)
+    try {
+      await prisma.liquidation.create({
+        data: {
+          userId: fields.userId,
+          marketId: fields.marketId || '',
+          side: fields.side || '',
+          qty: safeBigInt(fields.qty),
+          entryPrice: safeBigInt(fields.entryPrice),
+          markPrice: safeBigInt(fields.markPrice),
+          equity: safeBigInt(fields.equity),
+          surplus: safeBigInt(fields.surplus),
+          deficit: safeBigInt(fields.deficit),
+        },
+      })
+      console.log(`liquidation written to db for userId: ${fields.userId}`)
+    } catch (error) {
+      console.error(
+        `failed to write liquidation for user: ${fields.userId}`,
+        error
+      )
+    }
   } else {
     console.log('unknown stream message', fields)
   }
@@ -197,17 +219,26 @@ async function processFundingMessage(
     JSON.parse(fields.payments ?? '[]')
 
   if (payments.length > 0) {
-    await prisma.fundingPayment.createMany({
-      data: payments.map(p => ({
-        marketId: fields.marketId || '',
-        side: p.side,
-        amount: BigInt(p.amount || '0'),
-        fundingRate: BigInt(fields.fundingRate || '0'),
-        userId: p.userId,
-        createAt: new Date(Number(fields.timestamp || Date.now())),
-      })),
-    })
-    console.log(`funding payments written to db for market: ${fields.marketId}`)
+    try {
+      await prisma.fundingPayment.createMany({
+        data: payments.map(p => ({
+          marketId: fields.marketId || '',
+          side: p.side,
+          amount: BigInt(p.amount || '0'),
+          fundingRate: BigInt(fields.fundingRate || '0'),
+          userId: p.userId,
+          createAt: new Date(Number(fields.timestamp || Date.now())),
+        })),
+      })
+      console.log(
+        `funding payments written to db for market: ${fields.marketId}`
+      )
+    } catch (error) {
+      console.error(
+        `failed to write funding payments for market: ${fields.marketId}`,
+        error
+      )
+    }
   }
 
   await redis.xAck(FUNDING_STREAM, GROUP_NAME, messageId)

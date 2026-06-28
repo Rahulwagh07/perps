@@ -1,5 +1,5 @@
 import type { CreateOrderStreamMessage, Position } from '@repo/types'
-import { BPS_DIVISOR, MAINTENANCE_MARGIN_BPS } from './constant'
+import { BPS_DIVISOR, MAINTENANCE_MARGIN_BPS, BIGINT_SCALE } from './constant'
 
 export type LiquidationCheckResult = {
   userId: string
@@ -26,11 +26,11 @@ export function findLiquidatablePositions(
 
     const unrealizedPnl =
       pos.side === 'long'
-        ? (markPrice - entryPrice) * qty
-        : (entryPrice - markPrice) * qty
+        ? ((markPrice - entryPrice) * qty) / BIGINT_SCALE
+        : ((entryPrice - markPrice) * qty) / BIGINT_SCALE
 
     const remainingEquity = equity + unrealizedPnl
-    const notional = markPrice * qty
+    const notional = (markPrice * qty) / BIGINT_SCALE
     const maintenanceMargin = (notional * MAINTENANCE_MARGIN_BPS) / BPS_DIVISOR
 
     if (remainingEquity <= maintenanceMargin) {
@@ -85,8 +85,8 @@ export function calculateLiquidationResult(
 
   const pnl =
     position.side === 'long'
-      ? (fillPrice - entryPrice) * fillQty
-      : (entryPrice - fillPrice) * fillQty
+      ? ((fillPrice - entryPrice) * fillQty) / BIGINT_SCALE
+      : ((entryPrice - fillPrice) * fillQty) / BIGINT_SCALE
 
   const remainingEquity = equity + pnl
   const surplus = remainingEquity >= 0n ? remainingEquity : 0n

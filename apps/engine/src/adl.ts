@@ -1,5 +1,5 @@
 import type { Balance, Position } from '@repo/types'
-
+import { BIGINT_SCALE } from './constant'
 export type ADLEntry = {
   userId: string
   reducedQty: bigint
@@ -35,8 +35,8 @@ export function runADL(
 
     const pnl =
       targetSide === 'long'
-        ? (BigInt(markPrice) - entryPrice) * qty
-        : (entryPrice - BigInt(markPrice)) * qty
+        ? ((BigInt(markPrice) - entryPrice) * qty) / BIGINT_SCALE
+        : ((entryPrice - BigInt(markPrice)) * qty) / BIGINT_SCALE
 
     //skip unprofitable positions
     if (pnl <= 0n) continue
@@ -54,13 +54,13 @@ export function runADL(
     const qty = BigInt(pos.qty)
     const equity = BigInt(pos.equity)
 
-    const pnlPerUnit = target.pnl / qty
+    const pnlPerUnit = (target.pnl * BIGINT_SCALE) / qty
     const qtyNeededToCoverDeficit =
       pnlPerUnit > 0n ? (remainingDeficit + pnlPerUnit - 1n) / pnlPerUnit : qty
 
     const actualReduceQty =
       qtyNeededToCoverDeficit > qty ? qty : qtyNeededToCoverDeficit
-    const pnlRealized = pnlPerUnit * actualReduceQty
+    const pnlRealized = (pnlPerUnit * actualReduceQty) / BIGINT_SCALE
     const equityReturned = (equity * actualReduceQty) / qty
 
     reducePosition(

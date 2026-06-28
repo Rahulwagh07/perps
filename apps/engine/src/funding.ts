@@ -1,5 +1,5 @@
 import type { Balance, Position } from '@repo/types'
-import { BPS_DIVISOR, MAX_FUNDING_RATE_BPS } from './constant'
+import { BPS_DIVISOR, MAX_FUNDING_RATE_BPS, BIGINT_SCALE } from './constant'
 
 export type FundingResult = {
   payments: {
@@ -34,15 +34,16 @@ export function settleFunding(
     const equity = BigInt(pos.equity)
 
     //funding payment = positionSize * markPrice * fundingRate
-    const positionValue = qty * markPrice
-    const payment = (positionValue * fundingRate) / BPS_DIVISOR
+    const positionValue = (qty * markPrice) / BIGINT_SCALE
+    const absFundingRate = fundingRate < 0n ? -fundingRate : fundingRate
+    const paymentUnsigned = (positionValue * absFundingRate) / BPS_DIVISOR
 
     let fundingAmount: bigint
 
     if (pos.side === 'long') {
-      fundingAmount = -payment
+      fundingAmount = fundingRate > 0n ? -paymentUnsigned : paymentUnsigned
     } else {
-      fundingAmount = payment
+      fundingAmount = fundingRate > 0n ? paymentUnsigned : -paymentUnsigned
     }
 
     const newEquity = equity + fundingAmount

@@ -171,9 +171,9 @@ export function processOrder(
   balances: Map<string, Balance>,
   positions: Map<string, Map<string, Position>>
 ): OrderMatchResult {
-  if (msg.qty) msg.qty = Math.round(Number(msg.qty)).toString()
-  if (msg.price) msg.price = Math.round(Number(msg.price)).toString()
-  if (msg.initialMargin) msg.initialMargin = Math.round(Number(msg.initialMargin)).toString()
+  if (msg.qty) msg.qty = BigInt(msg.qty).toString()
+  if (msg.price) msg.price = BigInt(msg.price).toString()
+  if (msg.initialMargin) msg.initialMargin = BigInt(msg.initialMargin).toString()
 
 
   const balance = balances.get(msg.userId)
@@ -265,7 +265,9 @@ export function processOrder(
         //taker position update
         // taker is buying : long position
         //equity for this fill ->  proportional slice of their total margin
-        const takerEquityForFill = (margin * fillQty) / BigInt(msg.qty)
+        const takerFilledSoFarBefore = BigInt(msg.qty) - remainingQty
+        const takerFilledSoFarAfter = takerFilledSoFarBefore + fillQty
+        const takerEquityForFill = (margin * takerFilledSoFarAfter) / BigInt(msg.qty) - (margin * takerFilledSoFarBefore) / BigInt(msg.qty)
 
         updatePosition(
           positions,
@@ -282,8 +284,10 @@ export function processOrder(
         // maker was selling.. short position
         // their equity for this fill -> proportional slice of there order margin
         //initialMargin is the total margin locked for order
+        const makerFilledSoFarBefore = askOrder.filledQty
+        const makerFilledSoFarAfter = askOrder.filledQty + fillQty
         const makerEquityForFill =
-          (askOrder.initialMargin * fillQty) / askOrder.qty
+          (askOrder.initialMargin * makerFilledSoFarAfter) / askOrder.qty - (askOrder.initialMargin * makerFilledSoFarBefore) / askOrder.qty
 
         updatePosition(
           positions,
@@ -340,7 +344,9 @@ export function processOrder(
       ob.bids.set(msg.price, existing)
     } else if (remainingQty > 0n && msg.type === 'MARKET') {
       //market order not fully filled return the unfilled unfilled portion margin
-      const equityToReturn = (margin * remainingQty) / BigInt(msg.qty)
+      const takerFilledSoFarFinal = BigInt(msg.qty) - remainingQty
+      const totalUsedMargin = (margin * takerFilledSoFarFinal) / BigInt(msg.qty)
+      const equityToReturn = margin - totalUsedMargin
       balance.available = (
         BigInt(balance.available) + equityToReturn
       ).toString()
@@ -392,7 +398,9 @@ export function processOrder(
         })
 
         // taker is selling (short)
-        const takerEquityForFill = (margin * fillQty) / BigInt(msg.qty)
+        const takerFilledSoFarBefore = BigInt(msg.qty) - remainingQty
+        const takerFilledSoFarAfter = takerFilledSoFarBefore + fillQty
+        const takerEquityForFill = (margin * takerFilledSoFarAfter) / BigInt(msg.qty) - (margin * takerFilledSoFarBefore) / BigInt(msg.qty)
 
         updatePosition(
           positions,
@@ -406,8 +414,10 @@ export function processOrder(
         )
 
         //maker was buying (long)
+        const makerFilledSoFarBefore = bidOrder.filledQty
+        const makerFilledSoFarAfter = bidOrder.filledQty + fillQty
         const makerEquityForFill =
-          (bidOrder.initialMargin * fillQty) / bidOrder.qty
+          (bidOrder.initialMargin * makerFilledSoFarAfter) / bidOrder.qty - (bidOrder.initialMargin * makerFilledSoFarBefore) / bidOrder.qty
 
         updatePosition(
           positions,
@@ -461,7 +471,9 @@ export function processOrder(
       })
       ob.asks.set(msg.price, existing)
     } else if (remainingQty > 0n && msg.type === 'MARKET') {
-      const equityToReturn = (margin * remainingQty) / BigInt(msg.qty)
+      const takerFilledSoFarFinal = BigInt(msg.qty) - remainingQty
+      const totalUsedMargin = (margin * takerFilledSoFarFinal) / BigInt(msg.qty)
+      const equityToReturn = margin - totalUsedMargin
       balance.available = (
         BigInt(balance.available) + equityToReturn
       ).toString()

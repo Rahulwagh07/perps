@@ -15,3 +15,5 @@ export const INSURANCE_FEE_RATIO_BPS = 2000n //20%
 export const MAX_FUNDING_RATE_BPS = 100n //1%
 
 export const FUNDING_INTERVAL_MS = 60 * 60 * 1000
+
+export const BIGINT_SCALE = 1_000_000n

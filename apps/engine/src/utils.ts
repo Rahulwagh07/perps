@@ -1,5 +1,5 @@
 import type { Balance } from '@repo/types'
-import { BPS_DIVISOR, MAKER_FEE_BPS, TAKER_FEE_BPS } from './constant'
+import { BPS_DIVISOR, MAKER_FEE_BPS, TAKER_FEE_BPS, BIGINT_SCALE } from './constant'
 
 export function deductFees(
   fillQty: bigint,
@@ -7,8 +7,8 @@ export function deductFees(
   takerBal: Balance,
   makerBal: Balance
 ) {
-  const takerFee = (fillQty * fillPrice * TAKER_FEE_BPS) / BPS_DIVISOR
-  const makerFee = (fillQty * fillPrice * MAKER_FEE_BPS) / BPS_DIVISOR
+  const takerFee = (fillQty * fillPrice * TAKER_FEE_BPS) / (BPS_DIVISOR * BIGINT_SCALE)
+  const makerFee = (fillQty * fillPrice * MAKER_FEE_BPS) / (BPS_DIVISOR * BIGINT_SCALE)
 
   takerBal.available = (BigInt(takerBal.available) - takerFee).toString()
   makerBal.locked = (BigInt(makerBal.locked) - makerFee).toString()
@@ -21,5 +21,5 @@ export function calculatedEstimatedFees(
   price: bigint,
   fee: bigint
 ) {
-  return (qty * price * fee) / BPS_DIVISOR
+  return (qty * price * fee) / (BPS_DIVISOR * BIGINT_SCALE)
 }

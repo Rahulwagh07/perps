@@ -16,6 +16,7 @@
     "@radix-ui/react-slider": "^1.4.1",
     "@radix-ui/react-slot": "^1.3.0",
     "@radix-ui/react-tabs": "^1.1.15",
+    "@repo/types": "workspace:*",
     "axios": "^1.18.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

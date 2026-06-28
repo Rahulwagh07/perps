@@ -10,6 +10,7 @@ import { useMarketStore } from '../../store/market'
 import { api } from '../../lib/api'
 import { useWebSocket } from '../../hooks/useWebSocket'
 import { CHART_INTERVALS, type ChartInterval } from './chart-constants'
+import { fromScale } from '../../lib/utils'
 
 export function Chart() {
   const chartContainerRef = useRef<HTMLDivElement>(null)
@@ -96,10 +97,10 @@ export function Chart() {
             close: number
           }) => ({
             time: d.time as Time,
-            open: d.open,
-            high: d.high,
-            low: d.low,
-            close: d.close,
+            open: fromScale(d.open),
+            high: fromScale(d.high),
+            low: fromScale(d.low),
+            close: fromScale(d.close),
           })
         )
         seriesRef.current?.setData(formattedData)
@@ -141,7 +142,7 @@ export function Chart() {
       return
     if (historyLoadedForMarket !== activeMarket.id) return
 
-    const price = depth.lastTradedPrice
+    const price = fromScale(depth.lastTradedPrice)
     let intervalMs = 60 * 1000
     if (interval === '5m') intervalMs = 5 * 60 * 1000
     if (interval === '15m') intervalMs = 15 * 60 * 1000

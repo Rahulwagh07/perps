@@ -5,6 +5,7 @@ import type { Market } from '../../store/market'
 import { useAuthStore } from '../../store/auth'
 import { useUserDataStore } from '../../store/userData'
 import { useWebSocket } from '../../hooks/useWebSocket'
+import { formatPrice } from '../../lib/utils'
 import {
   Select,
   SelectContent,
@@ -106,7 +107,7 @@ export function Header() {
         </div>
         <div className="flex items-center gap-2 text-zinc-300 text-sm bg-zinc-900 px-3 py-1.5 rounded-md border border-zinc-800">
           <Wallet01Icon size={16} />
-          <span>${parseFloat(balance).toFixed(2)}</span>
+          <span>${formatPrice(balance)}</span>
         </div>
         <Button
           variant="ghost"

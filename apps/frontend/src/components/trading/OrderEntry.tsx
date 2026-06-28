@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { useWebSocket } from '../../hooks/useWebSocket'
 import { Slider } from '@/components/ui/slider'
+import { fromScale } from '../../lib/utils'
 
 export function OrderEntry() {
   const { activeMarket } = useMarketStore()
@@ -24,7 +25,8 @@ export function OrderEntry() {
       return Number(price)
     }
 
-    const currentPrice = depth.lastTradedPrice || depth.markPrice || 0
+    const lastTradedPrice = depth.lastTradedPrice ? fromScale(depth.lastTradedPrice) : 0
+    const currentPrice = lastTradedPrice || depth.markPrice || 0
 
     if (type === 'limit') {
       if (side === 'buy') {
@@ -34,9 +36,9 @@ export function OrderEntry() {
       }
     }
 
-    if (side === 'buy' && depth.asks.length > 0) return Number(depth.asks[0][0])
+    if (side === 'buy' && depth.asks.length > 0) return fromScale(Number(depth.asks[0][0]))
     if (side === 'sell' && depth.bids.length > 0)
-      return Number(depth.bids[0][0])
+      return fromScale(Number(depth.bids[0][0]))
 
     return currentPrice
   }

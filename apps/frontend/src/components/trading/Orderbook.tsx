@@ -17,14 +17,14 @@ export function Orderbook() {
   const asks = [...depth.asks].reverse().map(([price, qty], i, arr) => {
     const total = arr
       .slice(0, i + 1)
-      .reduce((acc, curr) => acc + parseFloat(curr[1]), 0)
+      .reduce((acc, curr) => acc + Number(curr[1]), 0)
     return { price, qty, total }
   })
 
   const bids = depth.bids.map(([price, qty], i, arr) => {
     const total = arr
       .slice(0, i + 1)
-      .reduce((acc, curr) => acc + parseFloat(curr[1]), 0)
+      .reduce((acc, curr) => acc + Number(curr[1]), 0)
     return { price, qty, total }
   })
 

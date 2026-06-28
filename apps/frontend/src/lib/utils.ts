@@ -1,13 +1,22 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { NUMBER_SCALE } from '@repo/types'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export const formatPrice = (price: string | number) => {
-  return parseFloat(price.toString()).toFixed(2)
+// convert a scaled BigInt string to number
+export const fromScale = (value: string | number): number => {
+  return Number(value) / NUMBER_SCALE
 }
+
+// format a scaled price
+export const formatPrice = (price: string | number) => {
+  return fromScale(price).toFixed(2)
+}
+
+// format a scaled qty
 export const formatQty = (qty: string | number) => {
-  return parseFloat(qty.toString()).toFixed(4)
+  return fromScale(qty).toFixed(4)
 }

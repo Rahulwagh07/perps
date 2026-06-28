@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express'
 import { depositSchema } from '../schema/balance-schema'
 import type { DepositStreamMessage } from '@repo/types'
+import { NUMBER_SCALE } from '@repo/types'
 import { QUEUE_ID } from '..'
 import { redis } from '../redis'
 
@@ -33,7 +34,7 @@ export async function Deposit(req: Request, res: Response) {
   const message: DepositStreamMessage = {
     msgType: 'DEPOSIT',
     userId: req.userId,
-    amount: amount.toString(),
+    amount: (amount * BigInt(NUMBER_SCALE)).toString(),
     identifier,
     queueId: QUEUE_ID,
   }

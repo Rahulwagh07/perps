@@ -3,6 +3,7 @@ import { api } from '../../lib/api'
 import { useUserDataStore } from '../../store/userData'
 import { useMarketStore } from '../../store/market'
 import { useWebSocket } from '../../hooks/useWebSocket'
+import { fromScale } from '../../lib/utils'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Table,
@@ -99,16 +100,17 @@ export function UserPanel() {
                 <TableBody>
                   {positions.map(position => {
                     const markPrice = depth?.markPrice
-                      ? depth.markPrice
-                      : undefined
-                    let unrealizedPnl = Number(position.unrealizedPnl)
+                    const unscaledQty = fromScale(position.qty)
+                    const unscaledAvgPrice = fromScale(position.averagePrice)
+                    const unscaledEquity = fromScale(position.equity)
+                    const unscaledLiqPrice = fromScale(position.liquidationPrice)
+
+                    let unrealizedPnl = fromScale(position.unrealizedPnl)
                     if (markPrice && position.marketId === activeMarket?.id) {
                       unrealizedPnl =
                         position.side === 'long'
-                          ? (markPrice - Number(position.averagePrice)) *
-                            Number(position.qty)
-                          : (Number(position.averagePrice) - markPrice) *
-                            Number(position.qty)
+                          ? (markPrice - unscaledAvgPrice) * unscaledQty
+                          : (unscaledAvgPrice - markPrice) * unscaledQty
                     }
 
                     return (
@@ -138,9 +140,9 @@ export function UserPanel() {
                             position.qty &&
                             position.averagePrice
                               ? (
-                                  (Number(position.qty) *
-                                    Number(position.averagePrice)) /
-                                  Number(position.equity)
+                                  (unscaledQty *
+                                    unscaledAvgPrice) /
+                                  unscaledEquity
                                 ).toFixed(2) + 'x'
                               : '-'}
                           </span>
@@ -148,12 +150,12 @@ export function UserPanel() {
                         <TableCell className="text-right font-mono">
                           $
                           {(
-                            Number(position.qty) * Number(position.averagePrice)
+                            unscaledQty * unscaledAvgPrice
                           ).toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right font-mono">
                           <span>
-                            ${Number(position.averagePrice).toFixed(2)}
+                            ${unscaledAvgPrice.toFixed(2)}
                           </span>
                           <span className="text-zinc-500 mx-1">/</span>
                           <span className="text-zinc-400">
@@ -161,10 +163,10 @@ export function UserPanel() {
                           </span>
                         </TableCell>
                         <TableCell className="text-right font-mono text-orange-400">
-                          ${Number(position.liquidationPrice).toFixed(2)}
+                          ${unscaledLiqPrice.toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          ${Number(position.equity).toFixed(2)}
+                          ${unscaledEquity.toFixed(2)}
                         </TableCell>
                         <TableCell
                           className={`text-right font-mono ${unrealizedPnl >= 0 ? 'text-emerald-500' : 'text-red-500'}`}
@@ -199,7 +201,11 @@ export function UserPanel() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {orders.map(order => (
+                  {orders.map(order => {
+                    const unscaledPrice = fromScale(order.price)
+                    const unscaledQty = fromScale(order.qty)
+                    const unscaledMargin = fromScale(order.initialMargin)
+                    return (
                     <TableRow
                       key={order.id}
                       className="border-zinc-800 hover:bg-zinc-900/50"
@@ -234,20 +240,20 @@ export function UserPanel() {
                         <span className="text-zinc-400 font-mono">
                           {order.initialMargin && order.qty
                             ? (
-                                (Number(order.price) * Number(order.qty)) /
-                                Number(order.initialMargin)
+                                (unscaledPrice * unscaledQty) /
+                                unscaledMargin
                               ).toFixed(2) + 'x'
                             : '-'}
                         </span>
                       </TableCell>
                       <TableCell className="font-mono">
-                        ${Number(order.price).toFixed(2)}
+                        ${unscaledPrice.toFixed(2)}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        ${(Number(order.price) * Number(order.qty)).toFixed(2)}
+                        ${(unscaledPrice * unscaledQty).toFixed(2)}
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )})}
                 </TableBody>
               </Table>
             )}
@@ -275,7 +281,10 @@ export function UserPanel() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {history.map(item => (
+                  {history.map(item => {
+                    const unscaledPrice = fromScale(item.price)
+                    const unscaledQty = fromScale(item.qty)
+                    return (
                     <TableRow
                       key={item.id}
                       className="border-zinc-800 hover:bg-zinc-900/50"
@@ -312,10 +321,10 @@ export function UserPanel() {
                           : 'SHORT'}
                       </TableCell>
                       <TableCell className="font-mono">
-                        ${Number(item.price).toFixed(2)}
+                        ${unscaledPrice.toFixed(2)}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        ${(Number(item.price) * Number(item.qty)).toFixed(2)}
+                        ${(unscaledPrice * unscaledQty).toFixed(2)}
                       </TableCell>
                       <TableCell className="text-right font-mono text-xs">
                         <span
@@ -325,7 +334,7 @@ export function UserPanel() {
                         </span>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )})}
                 </TableBody>
               </Table>
             )}

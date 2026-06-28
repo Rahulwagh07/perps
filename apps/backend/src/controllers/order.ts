@@ -6,6 +6,7 @@ import type {
   CreateOrderStreamMessage,
   EngineResponse,
 } from '@repo/types'
+import { NUMBER_SCALE } from '@repo/types'
 import { QUEUE_ID } from '..'
 import { redis } from '../redis'
 
@@ -29,12 +30,14 @@ export async function CreateOrder(req: Request, res: Response) {
         if (currentPrice > 0) {
           if (side === 'bid' && price > currentPrice) {
             return res.status(400).json({
-              error: 'Buy limit price cannot be higher than current market price',
+              error:
+                'Buy limit price cannot be higher than current market price',
             })
           }
           if (side === 'ask' && price < currentPrice) {
             return res.status(400).json({
-              error: 'Sell limit price cannot be lower than current market price',
+              error:
+                'Sell limit price cannot be lower than current market price',
             })
           }
         }
@@ -47,10 +50,10 @@ export async function CreateOrder(req: Request, res: Response) {
         marketId,
         type: type === 'limit' ? 'LIMIT' : 'MARKET',
         side: side === 'bid' ? 'BID' : 'ASK',
-        price: BigInt(Math.round(price)),
-        qty: BigInt(Math.round(qty)),
+        price: BigInt(Math.round(price * NUMBER_SCALE)),
+        qty: BigInt(Math.round(qty * NUMBER_SCALE)),
         filledQty: 0n,
-        initialMargin: BigInt(Math.round(initialMargin)),
+        initialMargin: BigInt(Math.round(initialMargin * NUMBER_SCALE)),
         status: 'OPEN',
       },
     })
@@ -64,9 +67,9 @@ export async function CreateOrder(req: Request, res: Response) {
       marketId,
       type: type === 'market' ? 'MARKET' : 'LIMIT',
       side: side === 'ask' ? 'ASK' : 'BID',
-      price: Math.round(price).toString(),
-      qty: Math.round(qty).toString(),
-      initialMargin: Math.round(initialMargin).toString(),
+      price: Math.round(price * NUMBER_SCALE).toString(),
+      qty: Math.round(qty * NUMBER_SCALE).toString(),
+      initialMargin: Math.round(initialMargin * NUMBER_SCALE).toString(),
       identifier,
       queueId: QUEUE_ID,
     }
