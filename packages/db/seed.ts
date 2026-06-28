@@ -4,24 +4,35 @@ import { prisma } from './db'
 async function main() {
   console.log('seeding database...')
 
-  const slug = 'SOL_USDC'
-  const imageUrl =
-    'https://wsrv.nl/?w=48&h=48&url=https%3A%2F%2Fraw.githubusercontent.com%2Fsolana-labs%2Ftoken-list%2Fmain%2Fassets%2Fmainnet%2FSo11111111111111111111111111111111111111112%2Flogo.png'
+  const markets = [
+    {
+      slug: 'SOL_USDC',
+      imageUrl:
+        'https://wsrv.nl/?w=48&h=48&url=https%3A%2F%2Fraw.githubusercontent.com%2Fsolana-labs%2Ftoken-list%2Fmain%2Fassets%2Fmainnet%2FSo11111111111111111111111111111111111111112%2Flogo.png',
+    },
+    {
+      slug: 'BTC_USDT',
+      imageUrl:
+        'https://wsrv.nl/?w=48&h=48&url=https%3A%2F%2Fraw.githubusercontent.com%2Fsolana-labs%2Ftoken-list%2Fmain%2Fassets%2Fmainnet%2F3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh%2Flogo.png',
+    },
+  ]
 
-  let market = await prisma.market.findFirst({
-    where: { slug },
-  })
-
-  if (!market) {
-    market = await prisma.market.create({
-      data: {
-        slug,
-        imageUrl,
-      },
+  for (const m of markets) {
+    let market = await prisma.market.findFirst({
+      where: { slug: m.slug },
     })
-    console.log(`created market: ${market.slug}`)
-  } else {
-    console.log(`market ${market.slug} already exists.`)
+
+    if (!market) {
+      market = await prisma.market.create({
+        data: {
+          slug: m.slug,
+          imageUrl: m.imageUrl,
+        },
+      })
+      console.log(`created market: ${market.slug}`)
+    } else {
+      console.log(`market ${market.slug} already exists.`)
+    }
   }
 }
 
