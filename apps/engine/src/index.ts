@@ -1,13 +1,14 @@
-import type {
-  Balance,
-  CancelOrderStreamMessage,
-  CreateOrderStreamMessage,
-  DepositStreamMessage,
-  DepthUpdate,
-  MarkPriceUpdateMessage,
-  Orderbook,
-  OrderStreamMessage,
-  Position,
+import {
+  type Balance,
+  type CancelOrderStreamMessage,
+  type CreateOrderStreamMessage,
+  type DepositStreamMessage,
+  type DepthUpdate,
+  type MarkPriceUpdateMessage,
+  type Orderbook,
+  type OrderStreamMessage,
+  type Position,
+  NUMBER_SCALE,
 } from '@repo/types'
 import { createClient } from 'redis'
 import { getLatestSnapshot, takeSnapshot } from './snapshot'
@@ -372,10 +373,11 @@ async function handleMarkPriceUpdate(
 
   if (now - lastFunding >= FUNDING_INTERVAL_MS) {
     const fundingRate = calculateFundingRate(ob.markPrice, ob.indexPrice)
+    const scaledMarkPrice = BigInt(Math.round(ob.markPrice * NUMBER_SCALE))
     const fundingResult = settleFunding(
       msg.marketId,
       fundingRate,
-      BigInt(Math.round(ob.markPrice)),
+      scaledMarkPrice,
       positions,
       balances
     )
@@ -404,10 +406,11 @@ async function handleMarkPriceUpdate(
     ob.markPrice = parseFloat(fields.markPrice)
     ob.indexPrice = parseFloat(fields.indexPrice)
 
+    const scaledMarkPrice = BigInt(Math.round(ob.markPrice * NUMBER_SCALE))
     //check liquidation
     const liquidatable = findLiquidatablePositions(
       msg.marketId,
-      BigInt(Math.round(ob.markPrice)),
+      scaledMarkPrice,
       positions
     )
 
@@ -417,7 +420,7 @@ async function handleMarkPriceUpdate(
         liq.userId,
         msg.marketId,
         liq.position,
-        Math.round(ob.markPrice).toString()
+        Math.round(ob.markPrice * NUMBER_SCALE).toString()
       )
       const result = processOrder(liqOrder, orderbooks, balances, positions)
 

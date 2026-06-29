@@ -71,9 +71,12 @@ export async function CreateOrder(req: Request, res: Response) {
       price: Math.round(price * NUMBER_SCALE).toString(),
       qty: Math.round(qty * NUMBER_SCALE).toString(),
       initialMargin: Math.round(initialMargin * NUMBER_SCALE).toString(),
-      slippage: slippage?.toString(),
       identifier,
       queueId: QUEUE_ID,
+    }
+
+    if (slippage !== undefined) {
+      message.slippage = slippage.toString()
     }
 
     await redis.xAdd(
