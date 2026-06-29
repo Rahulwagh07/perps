@@ -9,7 +9,7 @@ import type {
 import { useMarketStore } from '../../store/market'
 import { api } from '../../lib/api'
 import { useWebSocket } from '../../hooks/useWebSocket'
-import { CHART_INTERVALS, type ChartInterval } from './chart-constants'
+import { CHART_INTERVALS, type ChartInterval } from '../../lib/constants'
 import { fromScale } from '../../lib/utils'
 
 export function Chart() {
