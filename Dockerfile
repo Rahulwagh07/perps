@@ -1,21 +1,36 @@
 FROM oven/bun:1 AS base
 WORKDIR /app
 
-# Install only Node.js (needed by Prisma CLI to resolve engines)
-RUN apt-get update -y && apt-get install -y --no-install-recommends nodejs npm && rm -rf /var/lib/apt/lists/*
+#install deps
+FROM base AS deps
+COPY package.json bun.lock ./
+COPY apps/backend/package.json ./apps/backend/
+COPY apps/engine/package.json ./apps/engine/
+COPY apps/frontend/package.json ./apps/frontend/
+COPY apps/poller/package.json ./apps/poller/
+COPY apps/ws/package.json ./apps/ws/
+COPY packages/db/package.json ./packages/db/
+COPY packages/types/package.json ./packages/types/
+RUN bun install --frozen-lockfile
 
-# Copy the monorepo files
+# build (generate prisma client, needs node/npm)
+FROM deps AS builder
+RUN apt-get update -y && apt-get install -y --no-install-recommends nodejs npm \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY . .
-
-# Install dependencies using bun
-RUN bun install
-
-# Generate the prisma client using npx (bunx has a known bug with Prisma engine resolution)
 RUN npx prisma generate --schema=packages/db/prisma/schema.prisma
 
-# Accept a build argument to know which app we are building for
+FROM oven/bun:1-slim AS runner
+WORKDIR /app
+
 ARG APP_NAME
 ENV APP_NAME=${APP_NAME}
+ENV NODE_ENV=production
 
-# The start command (uses the APP_NAME variable to run the correct app)
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/apps ./apsps
+COPY --from=builder /app/packages ./packages
+
 CMD bun run --cwd apps/${APP_NAME} $(if [ -f apps/${APP_NAME}/src/index.ts ]; then echo "src/index.ts"; else echo "index.ts"; fi)
