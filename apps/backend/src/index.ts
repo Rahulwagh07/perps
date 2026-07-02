@@ -9,7 +9,16 @@ import { configDotenv } from 'dotenv'
 configDotenv()
 
 const app = express()
-app.use(cors())
+
+const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+app.use(cors({
+  origin: [
+    frontendUrl,
+    'http://localhost:5173'
+  ],
+  credentials: true
+}))
 app.use(express.json())
 app.use(authRoutes)
 app.use(marketRoutes)

@@ -24,7 +24,15 @@ const subscriptions = new Map<string, Set<WebSocket>>()
 const clientSubs = new Map<WebSocket, Set<string>>()
 const wss = new WebSocketServer({ port: PORT })
 
-wss.on('connection', (ws: WebSocket) => {
+wss.on('connection', (ws: WebSocket, req) => {
+  const origin = req.headers.origin;
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  
+  if (process.env.NODE_ENV === 'production' && origin && origin !== frontendUrl) {
+    ws.close();
+    return;
+  }
+
   clientSubs.set(ws, new Set())
 
   ws.on('message', (raw: Buffer) => {
