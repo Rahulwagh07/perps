@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuthStore } from '../store/auth'
 import { api } from '../lib/api'
+import { DEMO_USERNAME, DEMO_PASSWORD } from '../lib/constants'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,8 +17,8 @@ import {
 import { toast } from 'sonner'
 
 export function Login() {
-  const [username, setUsername] = useState('demo_user')
-  const [password, setPassword] = useState('Perps@demo!')
+  const [username, setUsername] = useState(DEMO_USERNAME)
+  const [password, setPassword] = useState(DEMO_PASSWORD)
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
   const setToken = useAuthStore(state => state.setToken)
