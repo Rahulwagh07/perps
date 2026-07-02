@@ -43,8 +43,8 @@ export function UserPanel() {
   }, [activeMarket, setHistory, setOrders, setPositions, userUpdateCount])
 
   return (
-    <div className="h-full bg-zinc-950 flex flex-col border-t border-zinc-800 min-h-0">
-      <Tabs defaultValue="positions" className="flex-1 flex flex-col min-h-0">
+    <div className="h-full w-full bg-zinc-950 flex flex-col border-t border-zinc-800 min-h-0 min-w-0 overflow-hidden">
+      <Tabs defaultValue="positions" className="flex-1 flex flex-col min-h-0 min-w-0">
         <div className="border-b border-zinc-800 px-4">
           <TabsList className="bg-transparent h-12">
             <TabsTrigger

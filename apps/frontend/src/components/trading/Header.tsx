@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Wallet01Icon, Logout01Icon } from 'hugeicons-react'
+import { HeaderSkeleton } from './HeaderSkeleton'
 
 export function Header() {
   const { markets, setMarkets, activeMarket, setActiveMarket } =
@@ -58,11 +59,7 @@ export function Header() {
   }, [setBalance, userUpdateCount])
 
   if (loading) {
-    return (
-      <div className="h-14 border-b border-zinc-800 bg-zinc-950 flex items-center px-4">
-        Loading...
-      </div>
-    )
+    return <HeaderSkeleton />
   }
 
   return (
@@ -76,7 +73,7 @@ export function Header() {
               if (m) setActiveMarket(m)
             }}
           >
-            <SelectTrigger className="w-[200px] bg-zinc-900 border-zinc-800">
+            <SelectTrigger className="md:w-[200px] w-[120px] h-8 bg-zinc-900 border-zinc-800">
               <SelectValue placeholder="Select Market" />
             </SelectTrigger>
             <SelectContent className="bg-zinc-900 border-zinc-800">
@@ -84,7 +81,7 @@ export function Header() {
                 <SelectItem
                   key={m.id}
                   value={m.id}
-                  className="text-zinc-300 focus:bg-zinc-800 focus:text-zinc-50"
+                  className="text-zinc-300 text-sm focus:bg-zinc-800 focus:text-zinc-50"
                 >
                   {m.slug.replace('_PERP', '')}
                 </SelectItem>
@@ -97,7 +94,7 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2 text-sm bg-zinc-900 px-3 py-1.5 rounded-md border border-zinc-800">
+        <div className="flex max-md:hidden items-center gap-2 text-sm bg-zinc-900 px-3 py-1.5 rounded-md border border-zinc-800">
           <div
             className={`w-2 h-2 rounded-full ${status === 'connected' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : status === 'connecting' ? 'bg-yellow-500 animate-pulse' : 'bg-red-500'}`}
           />

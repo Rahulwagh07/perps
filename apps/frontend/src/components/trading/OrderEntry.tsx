@@ -106,7 +106,7 @@ export function OrderEntry() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-zinc-950 p-4 w-[320px]">
+    <div className="flex flex-col h-full bg-zinc-950 p-4 w-full">
       <Tabs
         defaultValue="buy"
         onValueChange={(v: string) => setSide(v as 'buy' | 'sell')}
