@@ -27,9 +27,9 @@ export function UserPanel() {
     async function fetchData() {
       try {
         const [historyRes, ordersRes, positionsRes] = await Promise.all([
-          api.get(`/orders`),
+          api.get(`/orders?marketId=${activeMarket?.id}`),
           api.get(`/orders/open?marketId=${activeMarket?.id}`),
-          api.get(`/positions`),
+          api.get(`/positions?marketId=${activeMarket?.id}`),
         ])
         setHistory(historyRes.data)
         setOrders(ordersRes.data)

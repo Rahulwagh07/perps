@@ -17,3 +17,7 @@ export const deleteOrderSchema = z.object({
 export const getOrderSchema = z.object({
   orderId: z.string().min(1, 'Order id is required'),
 })
+
+export const marketQuerySchema = z.object({
+  marketId: z.string().min(1, 'Market id is required'),
+})

@@ -1,5 +1,9 @@
 import type { Request, Response } from 'express'
-import { createOrderSchema, deleteOrderSchema } from '../schema/order-schema'
+import {
+  createOrderSchema,
+  deleteOrderSchema,
+  marketQuerySchema,
+} from '../schema/order-schema'
 import { prisma } from '@repo/db'
 import type {
   CancelOrderStreamMessage,
@@ -20,7 +24,8 @@ export async function CreateOrder(req: Request, res: Response) {
   }
 
   try {
-    const { type, side, price, qty, marketId, initialMargin, slippage } = result.data
+    const { type, side, price, qty, marketId, initialMargin, slippage } =
+      result.data
 
     if (type === 'limit') {
       const depthCache = await redis.get(`depth:cache:${marketId}`)
@@ -235,8 +240,15 @@ export async function GetOrder(req: Request, res: Response) {
 
 export async function GetOrders(req: Request, res: Response) {
   try {
+    const result = marketQuerySchema.safeParse(req.query)
+    if (!result.success) {
+      return res.status(400).json({
+        error: result.error.issues,
+      })
+    }
+    const { marketId } = result.data
     const orders = await prisma.order.findMany({
-      where: { userId: req.userId },
+      where: { userId: req.userId, marketId },
     })
     return res.status(200).json(
       orders.map(order => ({
@@ -257,9 +269,18 @@ export async function GetOrders(req: Request, res: Response) {
 
 export async function GetOpenOrders(req: Request, res: Response) {
   try {
+    const result = marketQuerySchema.safeParse(req.query)
+    if (!result.success) {
+      return res.status(400).json({
+        error: result.error.issues,
+      })
+    }
+    const { marketId } = result.data
+
     const orders = await prisma.order.findMany({
       where: {
         userId: req.userId,
+        marketId: marketId,
         status: { in: ['OPEN', 'PARTIALLY_FILLED'] },
       },
     })
