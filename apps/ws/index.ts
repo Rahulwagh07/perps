@@ -25,12 +25,18 @@ const clientSubs = new Map<WebSocket, Set<string>>()
 const wss = new WebSocketServer({ port: PORT })
 
 wss.on('connection', (ws: WebSocket, req) => {
-  const origin = req.headers.origin;
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-  
-  if (process.env.NODE_ENV === 'production' && origin && origin !== frontendUrl) {
-    ws.close();
-    return;
+  const origin = req.headers.origin
+  const frontendUrl = process.env.FRONTEND_URL
+
+  if (
+    process.env.NODE_ENV === 'production' &&
+    origin &&
+    frontendUrl &&
+    origin !== frontendUrl
+  ) {
+    console.log('origin did not matched')
+    ws.close()
+    return
   }
 
   clientSubs.set(ws, new Set())
@@ -68,8 +74,8 @@ function handleClientMessage(ws: WebSocket, msg: ClientMessage) {
       continue
     }
 
-    const channelId = stream === 'depth' ? marketId : parts.slice(1).join('.'); // marketId or userId
-    
+    const channelId = stream === 'depth' ? marketId : parts.slice(1).join('.') // marketId or userId
+
     if (msg.method === 'SUBSCRIBE') {
       subscribe(ws, stream + '.' + channelId)
     } else if (msg.method === 'UNSUBSCRIBE') {
@@ -99,10 +105,12 @@ async function subscribe(ws: WebSocket, channelId: string) {
     const marketId = channelId.slice('depth.'.length)
     const cachedDepth = await redisClient.get(`depth:cache:${marketId}`)
     if (cachedDepth && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({
-        stream: 'depth',
-        data: JSON.parse(cachedDepth)
-      }))
+      ws.send(
+        JSON.stringify({
+          stream: 'depth',
+          data: JSON.parse(cachedDepth),
+        })
+      )
     }
   }
 }
