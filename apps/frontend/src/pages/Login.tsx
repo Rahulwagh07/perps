@@ -16,8 +16,8 @@ import {
 import { toast } from 'sonner'
 
 export function Login() {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
+  const [username, setUsername] = useState('demo_user')
+  const [password, setPassword] = useState('Perps@demo!')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
   const setToken = useAuthStore(state => state.setToken)
