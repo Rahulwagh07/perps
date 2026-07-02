@@ -6,12 +6,11 @@ FROM base AS deps
 COPY package.json bun.lock ./
 COPY apps/backend/package.json ./apps/backend/
 COPY apps/engine/package.json ./apps/engine/
-COPY apps/frontend/package.json ./apps/frontend/
 COPY apps/poller/package.json ./apps/poller/
 COPY apps/ws/package.json ./apps/ws/
 COPY packages/db/package.json ./packages/db/
 COPY packages/types/package.json ./packages/types/
-RUN bun install --frozen-lockfile
+RUN bun install --frozen-lockfiles
 
 # build (generate prisma client, needs node/npm)
 FROM deps AS builder
