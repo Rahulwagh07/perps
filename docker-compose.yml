@@ -43,6 +43,8 @@ services:
       - NODE_ENV=production
     restart: unless-stopped
     mem_limit: 512m
+    volumes:
+      - ./apps/engine/snapshots:/app/apps/engine/snapshots
 
   poller:
     build:
