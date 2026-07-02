@@ -1,4 +1,4 @@
-# Perps Trading Platform
+# Perpetual Trading Platform
 
 Perpetual trading engine with real-time order matching, Redis Streams, crash recovery, and a scalable event-driven architecture.
 
