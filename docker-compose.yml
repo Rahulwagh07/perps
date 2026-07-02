@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      args:
+        APP_NAME: backend
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    restart: always
+    # Exposing internally so nginx can reach it
+    expose:
+      - '3000'
+
+  ws:
+    build:
+      context: .
+      args:
+        APP_NAME: ws
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=8081
+    restart: always
+    expose:
+      - '8081'
+
+  engine:
+    build:
+      context: .
+      args:
+        APP_NAME: engine
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    restart: always
+
+  poller:
+    build:
+      context: .
+      args:
+        APP_NAME: poller
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    restart: always
+
+  # Nginx Reverse Proxy (Handles Rate Limiting)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - '80:80'
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - ws
+    restart: always
