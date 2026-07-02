@@ -51,7 +51,7 @@ turbo dev
 
 The services will start on their respective ports:
 
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:3000
-- **WebSocket Server**: ws://localhost:8080
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:3000
+- WebSocket Server: ws://localhost:8080
 ````
