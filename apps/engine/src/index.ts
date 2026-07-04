@@ -521,8 +521,6 @@ async function publishDepth(marketId: string) {
     indexPrice: ob.indexPrice,
   }
 
-  //cache for backend reads
-  await redis.set(`depth:cache:${marketId}`, JSON.stringify(depth))
   await redis.publish(`depth:${marketId}`, JSON.stringify(depth))
 }
 await init()
