@@ -1,4 +1,11 @@
 services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    mem_limit: 128m
+    volumes:
+      - redis_data:/data
+
   backend:
     build:
       context: .
@@ -11,6 +18,8 @@ services:
       - NODE_ENV=production
       - PORT=3000
     restart: unless-stopped
+    depends_on:
+      - redis
     expose:
       - '3000'
     mem_limit: 512m
@@ -27,6 +36,8 @@ services:
       - NODE_ENV=production
       - PORT=8081
     restart: unless-stopped
+    depends_on:
+      - redis
     expose:
       - '8081'
     mem_limit: 512m
@@ -42,6 +53,8 @@ services:
     environment:
       - NODE_ENV=production
     restart: unless-stopped
+    depends_on:
+      - redis
     mem_limit: 512m
     volumes:
       - ./apps/engine/snapshots:/app/apps/engine/snapshots
@@ -57,6 +70,8 @@ services:
     environment:
       - NODE_ENV=production
     restart: unless-stopped
+    depends_on:
+      - redis
     mem_limit: 512m
 
   nginx:
@@ -71,3 +86,6 @@ services:
       - backend
       - ws
     restart: unless-stopped
+
+volumes:
+  redis_data:
