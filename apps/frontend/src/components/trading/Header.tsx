@@ -16,6 +16,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Wallet01Icon, Logout01Icon } from 'hugeicons-react'
 import { HeaderSkeleton } from './HeaderSkeleton'
+import { DepositModal } from './DepositModal'
 
 export function Header() {
   const { markets, setMarkets, activeMarket, setActiveMarket } =
@@ -23,6 +24,7 @@ export function Header() {
   const { balance, setBalance } = useUserDataStore()
   const logout = useAuthStore(state => state.logout)
   const [loading, setLoading] = useState(true)
+  const [depositOpen, setDepositOpen] = useState(false)
 
   const { userUpdateCount, status } = useWebSocket()
 
@@ -63,58 +65,68 @@ export function Header() {
   }
 
   return (
-    <header className="h-14 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between px-4 sticky top-0 z-50">
-      <div className="flex items-center gap-6">
-        {markets.length > 0 ? (
-          <Select
-            value={activeMarket?.id}
-            onValueChange={(val: string) => {
-              const m = markets.find(m => m.id === val)
-              if (m) setActiveMarket(m)
-            }}
-          >
-            <SelectTrigger className="md:w-[200px] w-[120px] h-8 bg-zinc-900 border-zinc-800">
-              <SelectValue placeholder="Select Market" />
-            </SelectTrigger>
-            <SelectContent className="bg-zinc-900 border-zinc-800">
-              {markets.map(m => (
-                <SelectItem
-                  key={m.id}
-                  value={m.id}
-                  className="text-zinc-300 text-sm focus:bg-zinc-800 focus:text-zinc-50"
-                >
-                  {m.slug.replace('_PERP', '')}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : (
-          <div className="text-zinc-500 text-sm">No markets available</div>
-        )}
-      </div>
+    <>
+      <header className="h-14 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between px-4 sticky top-0 z-50">
+        <div className="flex items-center gap-6">
+          {markets.length > 0 ? (
+            <Select
+              value={activeMarket?.id}
+              onValueChange={(val: string) => {
+                const m = markets.find(m => m.id === val)
+                if (m) setActiveMarket(m)
+              }}
+            >
+              <SelectTrigger className="md:w-[200px] w-[120px] h-8 bg-zinc-900 border-zinc-800">
+                <SelectValue placeholder="Select Market" />
+              </SelectTrigger>
+              <SelectContent className="bg-zinc-900 border-zinc-800">
+                {markets.map(m => (
+                  <SelectItem
+                    key={m.id}
+                    value={m.id}
+                    className="text-zinc-300 text-sm focus:bg-zinc-800 focus:text-zinc-50"
+                  >
+                    {m.slug.replace('_PERP', '')}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="text-zinc-500 text-sm">No markets available</div>
+          )}
+        </div>
 
-      <div className="flex items-center gap-4">
-        <div className="flex max-md:hidden items-center gap-2 text-sm bg-zinc-900 px-3 py-1.5 rounded-md border border-zinc-800">
-          <div
-            className={`w-2 h-2 rounded-full ${status === 'connected' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : status === 'connecting' ? 'bg-yellow-500 animate-pulse' : 'bg-red-500'}`}
-          />
-          <span className="text-zinc-400 text-xs font-medium capitalize">
-            {status}
-          </span>
+        <div className="flex items-center gap-3">
+          <div className="flex max-md:hidden items-center gap-2 text-sm bg-zinc-900 px-3 py-1.5 rounded-md border border-zinc-800">
+            <div
+              className={`w-2 h-2 rounded-full ${status === 'connected' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : status === 'connecting' ? 'bg-yellow-500 animate-pulse' : 'bg-red-500'}`}
+            />
+            <span className="text-zinc-400 text-xs font-medium capitalize">
+              {status}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 text-zinc-300 text-sm bg-zinc-900 px-3 py-1.5 rounded-md border border-zinc-800">
+            <Wallet01Icon size={16} />
+            <span>${formatPrice(balance)}</span>
+          </div>
+          <Button
+            id="deposit-btn"
+            onClick={() => setDepositOpen(true)}
+            className="h-8 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs"
+          >
+            Deposit
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={logout}
+            className="text-zinc-400 hover:text-zinc-100"
+          >
+            <Logout01Icon size={18} />
+          </Button>
         </div>
-        <div className="flex items-center gap-2 text-zinc-300 text-sm bg-zinc-900 px-3 py-1.5 rounded-md border border-zinc-800">
-          <Wallet01Icon size={16} />
-          <span>${formatPrice(balance)}</span>
-        </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={logout}
-          className="text-zinc-400 hover:text-zinc-100"
-        >
-          <Logout01Icon size={18} />
-        </Button>
-      </div>
-    </header>
+      </header>
+      <DepositModal open={depositOpen} onOpenChange={setDepositOpen} />
+    </>
   )
 }
