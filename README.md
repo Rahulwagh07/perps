@@ -4,54 +4,76 @@ Perpetual trading engine with real-time order matching, Redis Streams, crash rec
 
 ## Tech Stack
 
-- **Frontend:** React, Zunstand, Shadcn
-- **Backend API:** Node.js, Express, Zod
-- **Matching Engine:** Node.js (high-performance order matching)
-- **Real-time:** WebSocket Server
+- **Runtime / monorepo:** Bun, Turborepo
+- **Frontend:** React, Zustand, Tailwind, lightweight-charts
+- **Backend API:** Express, Zod, Prisma
+- **Matching Engine:** In-memory order matching, funding, liquidations, ADL
+- **Real-time:** WebSocket server + Redis pub/sub
+- **Messaging:** Redis Streams
 - **Database:** PostgreSQL
 
 ## Apps and Packages
 
-- `apps/frontend`: The React trading interface.
-- `apps/backend`: The REST API handling authentication, balances, and order submissions.
-- `apps/ws`: The WebSocket server streaming real-time orderbook depth and trades.
-- `apps/engine`: The core matching engine that processes orders from Redis.
-- `packages/db`: Prisma schema and database client.
-- `packages/types`: Shared TypeScript definitions across apps.
+| Path | Role |
+|------|------|
+| `apps/frontend` | React trading UI (charts, order entry, positions) |
+| `apps/backend` | REST API — auth, balances, orders, positions, klines |
+| `apps/engine` | In-memory matching engine (orders, funding, liquidations, ADL) |
+| `apps/ws` | WebSocket fan-out for depth and user updates |
+| `apps/poller` | Persists fills/funding to Postgres; feeds Binance mark prices |
+| `packages/db` | Prisma schema and PostgreSQL client (`@repo/db`) |
+| `packages/types` | Shared TypeScript types (`@repo/types`) |
+
+### Redis primitives
+
+| Name | Kind | Purpose |
+|------|------|---------|
+| `orders:stream` | Stream | Commands to the engine |
+| `fills:stream` | Stream | Fills / liquidations → poller |
+| `funding:stream` | Stream | Funding payments → poller |
+| `response:{queueId}:{id}` | Stream | Sync engine → backend replies |
+| `depth:{marketId}` | Pub/Sub | Live orderbook depth |
+| `user:{userId}` | Pub/Sub | User refresh events |
+| `balance:{userId}` / `positions:{userId}` | Keys | Live account state |
+
+## Getting Started
 
 ### Installation
 
-1. Install dependencies
+1. Install dependencies:
 
 ```bash
 bun install
 ```
 
-2. Start the database and Redis using Docker:
+2. Start Redis and the app services (Postgres is external — set `DATABASE_URL` in `.env`):
 
 ```bash
 docker-compose up -d
 ```
 
-3. Setup the database (Prisma migrations):
+3. Set up the database:
 
 ```bash
 cd packages/db
-npx prisma generate
-npx prisma db push
+bunx prisma generate
+bunx prisma db push
 ```
 
-### Running the Platform
+### Running locally
 
-To start all services (Frontend, Backend, WS, and Engine) for development:
+To start Frontend, Backend, WS, Engine, and Poller in development:
 
-````bash
+```bash
 turbo dev
 ```
 
-The services will start on their respective ports:
+Services:
 
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:3000
-- WebSocket Server: ws://localhost:8080
-````
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:5173 |
+| Backend API | http://localhost:3000 |
+| WebSocket | ws://localhost:8081 |
+
+Docker Compose also runs **nginx** (ports 80/443), routing `/api` → backend and `/ws` → the WebSocket server.
