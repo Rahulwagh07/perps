@@ -249,6 +249,7 @@ export async function GetOrders(req: Request, res: Response) {
     const { marketId } = result.data
     const orders = await prisma.order.findMany({
       where: { userId: req.userId, marketId },
+      orderBy: { createdAt: 'desc' },
     })
     return res.status(200).json(
       orders.map(order => ({
@@ -283,6 +284,7 @@ export async function GetOpenOrders(req: Request, res: Response) {
         marketId: marketId,
         status: { in: ['OPEN', 'PARTIALLY_FILLED'] },
       },
+      orderBy: { createdAt: 'desc' },
     })
     return res.status(200).json(
       orders.map(order => ({
