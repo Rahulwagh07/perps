@@ -8,6 +8,7 @@ import {
 import { Login } from './pages/Login'
 import { Signup } from './pages/Signup'
 import { Trade } from './pages/Trade'
+import { AddMarket } from './pages/AddMarket'
 import { useAuthStore } from './store/auth'
 import { Toaster } from './components/ui/sonner'
 
@@ -33,6 +34,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Trade />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/add-market"
+            element={
+              <ProtectedRoute>
+                <AddMarket />
               </ProtectedRoute>
             }
           />
