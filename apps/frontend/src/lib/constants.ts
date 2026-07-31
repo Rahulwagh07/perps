@@ -4,3 +4,4 @@ export const CHART_INTERVALS = ['1m', '5m', '15m'] as const
 export type ChartInterval = (typeof CHART_INTERVALS)[number]
 export const DEMO_USERNAME = 'demo_user'
 export const DEMO_PASSWORD = 'Perps@demo!'
+export const MAX_DEPOSIT_AMOUNT = 10000000

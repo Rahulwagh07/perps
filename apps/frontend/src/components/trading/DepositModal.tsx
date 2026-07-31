@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api } from '../../lib/api'
 import { useUserDataStore } from '../../store/userData'
+import { MAX_DEPOSIT_AMOUNT } from '../../lib/constants'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -21,6 +22,7 @@ interface DepositModalProps {
 export function DepositModal({ open, onOpenChange }: DepositModalProps) {
   const [amount, setAmount] = useState('')
   const [loading, setLoading] = useState(false)
+  const [limitError, setLimitError] = useState(false)
   const setBalance = useUserDataStore(state => state.setBalance)
 
   const handleDeposit = async () => {
@@ -50,7 +52,6 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
       setLoading(false)
     }
   }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -76,12 +77,23 @@ export function DepositModal({ open, onOpenChange }: DepositModalProps) {
                 placeholder="0.00"
                 min="1"
                 value={amount}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  setAmount(e.target.value)
-                }
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  const val = e.target.value
+                  if (val === '' || Number(val) <= MAX_DEPOSIT_AMOUNT) {
+                    setAmount(val)
+                    setLimitError(false)
+                  } else {
+                    setLimitError(true)
+                  }
+                }}
                 className="bg-zinc-900 border-zinc-800 text-zinc-100 font-mono text-lg h-12 pl-8 focus-visible:ring-emerald-500/30 focus-visible:border-emerald-500/50"
               />
             </div>
+            {limitError && (
+              <p className="text-red-500 text-xs mt-1">
+                Maximum deposit is ${MAX_DEPOSIT_AMOUNT.toLocaleString()}
+              </p>
+            )}
           </div>
 
           <Button
