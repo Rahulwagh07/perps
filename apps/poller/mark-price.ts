@@ -5,6 +5,23 @@ import { buildStreamUrl, slugToBinanceSymbol } from './utils'
 
 const ORDER_STREAM = 'orders:stream'
 const RETRY_MS = 5000
+const MIN_MARK_PRICE_INTERVAL_MS = 600000
+const IMMEDIATE_MOVE_BPS = 100
+
+const lastSent = new Map<string, { markPrice: string; indexPrice: string; at: number }>()
+
+function shouldForward(marketId: string, markPrice: string, indexPrice: string): boolean {
+  const prev = lastSent.get(marketId)
+  if (!prev) return true
+  if (markPrice === prev.markPrice && indexPrice === prev.indexPrice) return false
+  if (Date.now() - prev.at < MIN_MARK_PRICE_INTERVAL_MS) {
+    const cur = Number(markPrice)
+    const old = Number(prev.markPrice)
+    if (!Number.isFinite(cur) || !Number.isFinite(old) || old === 0) return false
+    return Math.abs((cur - old) / old) * 10000 >= IMMEDIATE_MOVE_BPS
+  }
+  return true
+}
 
 let markets: MarketMapping[] = []
 let symbolToMarketId = new Map<string, string>()
@@ -91,9 +108,11 @@ function connect() {
       const markPrice = data.p
       const indexPrice = data.i
 
-      console.log('markprice', markPrice, 'indexPrice', indexPrice)
-
       if (!markPrice) return
+      if (!shouldForward(marketId, markPrice, indexPrice)) return
+      lastSent.set(marketId, { markPrice, indexPrice, at: Date.now() })
+
+      console.log('markprice', markPrice, 'indexPrice', indexPrice)
 
       const res = await redis.xAdd(ORDER_STREAM, '*', {
         msgType: 'MARK_PRICE_UPDATE',
