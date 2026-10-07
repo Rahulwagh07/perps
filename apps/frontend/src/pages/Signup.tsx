@@ -1,23 +1,18 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { AxiosError } from 'axios'
+import { Eye, EyeOff } from 'lucide-react'
 import { api } from '../lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
 import { toast } from 'sonner'
+import { AuthLayout } from '../components/AuthLayout'
 
 export function Signup() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
 
@@ -41,67 +36,75 @@ export function Signup() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4 bg-zinc-950">
-      <Card className="w-full max-w-sm border-zinc-800 bg-zinc-900/50 backdrop-blur-xl">
-        <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold tracking-tight">
-            Create account
-          </CardTitle>
-          <CardDescription className="text-zinc-400">
-            Perpetual Futures Exchange
-          </CardDescription>
-        </CardHeader>
-        <form onSubmit={handleSignup}>
-          <CardContent className="space-y-4">
-            <div className="space-y-2 text-left">
-              <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                type="text"
-                placeholder="Enter username"
-                required
-                value={username}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  setUsername(e.target.value)
-                }
-                className="bg-zinc-950 border-zinc-800 focus-visible:ring-zinc-700"
-              />
-            </div>
-            <div className="space-y-2 text-left">
-              <Label htmlFor="password">Password</Label>
+    <AuthLayout>
+      <div className="auth-card-solid rounded-lg border border-zinc-800/80 px-8 py-9">
+        <h1 className="text-center text-2xl font-bold tracking-tight">
+          Create account on Perpetual Exchange
+        </h1>
+
+        <form onSubmit={handleSignup} className="mt-8 space-y-5">
+          <div className="space-y-2 text-left">
+            <Label htmlFor="email" className="text-[13px] font-bold">
+              Email address
+            </Label>
+            <Input
+              id="email"
+              type="text"
+              placeholder="you@email.com"
+              required
+              value={username}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setUsername(e.target.value)
+              }
+              className="h-11 rounded-md border-zinc-800 bg-black placeholder:text-zinc-500 focus-visible:ring-zinc-700"
+            />
+          </div>
+          <div className="space-y-2 text-left">
+            <Label htmlFor="password" className="text-[13px] font-bold">
+              Password
+            </Label>
+            <div className="relative">
               <Input
                 id="password"
-                type="password"
-                placeholder="Enter password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Enter your password"
                 required
                 value={password}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setPassword(e.target.value)
                 }
-                className="bg-zinc-950 border-zinc-800 focus-visible:ring-zinc-700"
+                className="h-11 rounded-md border-zinc-800 bg-black pr-11 placeholder:text-zinc-500 focus-visible:ring-zinc-700"
               />
-            </div>
-          </CardContent>
-          <CardFooter className="flex flex-col space-y-4">
-            <Button
-              type="submit"
-              className="w-full bg-zinc-100 text-zinc-900 hover:bg-zinc-200 font-semibold"
-              disabled={loading}
-            >
-              {loading ? 'Creating...' : 'Create account'}
-            </Button>
-            <div className="text-sm text-center text-zinc-400">
-              Already have an account?{' '}
-              <Link
-                to="/login"
-                className="text-zinc-50 hover:underline transition-colors"
+              <button
+                type="button"
+                onClick={() => setShowPassword(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 transition-colors hover:text-zinc-200"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
-                Login
-              </Link>
+                {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
             </div>
-          </CardFooter>
+          </div>
+
+          <Button
+            type="submit"
+            className="h-11 w-full rounded-md bg-zinc-100 font-medium text-zinc-900 hover:bg-white !mt-7"
+            disabled={loading}
+          >
+            {loading ? 'Creating...' : 'Create account'}
+          </Button>
         </form>
-      </Card>
-    </div>
+
+        <div className="mt-6 text-center text-[13px] text-zinc-400">
+          Already have an account?{' '}
+          <Link
+            to="/login"
+            className="font-medium text-zinc-50 transition-colors hover:underline"
+          >
+            Login
+          </Link>
+        </div>
+      </div>
+    </AuthLayout>
   )
 }
