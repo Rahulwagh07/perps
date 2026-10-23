@@ -3,6 +3,7 @@
   "module": "index.ts",
   "type": "module",
   "scripts": {
+    "test": "bun test",
     "dev": "bun --watch src/index.ts"
   },
   "private": true,
